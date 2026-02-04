@@ -50,5 +50,36 @@
       "fail": 0.01
     },
     "comment": "Fail-fast if bad record rate exceeds 1%."
+  },
+  {
+    "rule_id": "silver_entry_type_allowed_v1",
+    "domain": "silver",
+    "metric": "entry_type_allowed",
+    "allowed_values": [
+      "CHARGE",
+      "WITHDRAW",
+      "PAYMENT",
+      "RECEIVE",
+      "REFUND_OUT",
+      "REFUND_IN",
+      "HOLD",
+      "RELEASE",
+      "MINT",
+      "BURN"
+    ],
+    "comment": "Allowed ledger entry types (mock baseline)."
+  },
+  {
+    "rule_id": "silver_payment_status_allowed_v1",
+    "domain": "silver",
+    "metric": "payment_status_allowed",
+    "allowed_values": [
+      "PAID",
+      "PENDING",
+      "FAILED",
+      "CANCELLED",
+      "REFUNDED"
+    ],
+    "comment": "Allowed payment order statuses (initial baseline)."
   }
 ]
