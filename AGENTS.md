@@ -178,28 +178,9 @@ Decision defaults
 
  -  **Time**: Storage/calc in UTC, day boundary in KST
  -  **Window**: `[start, end)` - start inclusive, end exclusive
- -  **Amount sign**: Derived from entry_type mapping (see below)
+ -  **Amount sign**: Derived from entry_type mapping (see `data_contract.md` section 5.2.1)
 
 Full defaults and thresholds: `.specs/project_specs.md` section 7 and Appendix.
-
-
-Entry type sign mapping
------------------------
-
-Amount sign is derived from `entry_type`. See `data_contract.md` section 5.2.1.
-
-| entry_type | amount_signed | Description |
-|------------|---------------|-------------|
-| CHARGE | +amount | KRW → NSC deposit |
-| WITHDRAW | -amount | NSC → KRW withdrawal |
-| PAYMENT | -amount | Payment (buyer) |
-| RECEIVE | +amount | Payment receipt (seller) |
-| REFUND_OUT | -amount | Refund payout (seller) |
-| REFUND_IN | +amount | Refund receipt (buyer) |
-| HOLD | 0 | available → frozen |
-| RELEASE | 0 | frozen → available |
-
-Pairing: PAYMENT ↔ RECEIVE, REFUND_OUT ↔ REFUND_IN via same `related_id`.
 
 
 Testing strategy
@@ -222,6 +203,46 @@ Testing strategy
  -  Merge gate: E2E smoke tests pass
 
 See `.specs/project_specs.md` section 10-11 for test and CI/CD details.
+
+
+Verification policy
+-------------------
+
+### Verification contract
+
+ -  Verification is mandatory. Do not claim completion without running an
+    appropriate verification level.
+ -  Store evidence under `.agents/logs/verification/`.
+ -  Do not encode verification level in commit messages.
+
+### Verification ladder
+
+| Level | When | Duration | Command | Pass Criteria |
+|-------|------|----------|---------|---------------|
+| L0 | Per edit | < 30s | `python -m py_compile` | No syntax errors |
+| L1 | Pre-commit | < 2min | `pytest tests/unit/ -x` | All unit tests pass |
+| L2 | Pre-PR | < 10min | `pytest --cov-fail-under=80` | 80%+ coverage |
+| L3 | Pre-merge | < 30min | Databricks Dev E2E | Idempotency verified |
+
+### Escalation triggers
+
+ -  If in doubt, move up one level.
+ -  `src/transforms/` changes: Minimum L1
+ -  `src/io/`, `src/jobs/` changes: Minimum L2
+ -  Reconciliation logic, rule table changes: L3 required
+ -  `data_contract.md` changes: L3 + manual review
+
+### Exceptions
+
+ -  Documentation-only changes: May skip L0-L2
+ -  Emergency hotfix: May skip L1, L2 with post-hoc L3 within 24h
+
+### Toolbox
+
+ -  L0: `python -m py_compile ${FILE}`
+ -  L1: `pytest tests/unit/ -v -x`
+ -  L2: `pytest tests/unit/ tests/integration/ -v --cov=src --cov-fail-under=80`
+ -  L3: `databricks jobs run-now --job-id ${JOB_ID}`
 
 
 Security
