@@ -72,7 +72,7 @@ python -m pytest tests/unit/ tests/integration/ -v --cov=src --cov-fail-under=80
 ## 향후 확장
 
 현재 미구현 기능:
-- **FR-ANA-02 (실시간 시세 모니터링)**: 실시간 스트리밍 인프라 구축 후 추가 예정
+- **FR-ANA-02 (실시간 시세 모니터링)**: 실제로 들어갈지 팀원들과 협의 필요
 
 새로운 OLAP 분석 요구사항이 생기면 Gold 레이어에 테이블을 추가하여 확장할 수 있습니다.
 Bronze/Silver 레이어는 범용적으로 설계되어 있어 추가 파이프라인 개발이 용이합니다.
