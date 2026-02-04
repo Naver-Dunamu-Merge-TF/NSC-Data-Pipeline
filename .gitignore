@@ -206,3 +206,8 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 .ref/
+
+# Agent verification logs (ignore log content, keep structure)
+.agents/logs/**/*.json
+.agents/logs/**/*.log
+.agents/logs/**/*.txt
