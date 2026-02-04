@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 
 from src.common.time_utils import UTC, ensure_tzaware
 
@@ -16,6 +16,7 @@ class RuleDefinition:
     metric: str | None
     threshold: float | int | None
     severity_map: Mapping[str, float] | None
+    allowed_values: tuple[str, ...] | None
     comment: str | None
     effective_start_ts: datetime
     effective_end_ts: datetime | None
@@ -31,6 +32,7 @@ class RuleDefinition:
         metric = payload.get("metric")
         threshold = payload.get("threshold")
         severity_map = payload.get("severity_map")
+        allowed_values = _parse_allowed_values(payload.get("allowed_values"))
         comment = payload.get("comment")
 
         effective_start = _parse_datetime(payload.get("effective_start_ts"))
@@ -48,6 +50,7 @@ class RuleDefinition:
             metric=metric,
             threshold=threshold,
             severity_map=severity_map,
+            allowed_values=allowed_values,
             comment=comment,
             effective_start_ts=effective_start,
             effective_end_ts=effective_end,
@@ -61,6 +64,7 @@ class RuleDefinition:
             "metric": self.metric,
             "threshold": self.threshold,
             "severity_map": self.severity_map,
+            "allowed_values": self.allowed_values,
             "comment": self.comment,
             "effective_start_ts": self.effective_start_ts.isoformat(),
             "effective_end_ts": self.effective_end_ts.isoformat()
@@ -80,3 +84,28 @@ def _parse_datetime(value: Any) -> datetime | None:
         parsed = datetime.fromisoformat(normalized)
         return ensure_tzaware(parsed)
     raise TypeError("Unsupported datetime value")
+
+
+def _parse_allowed_values(value: Any) -> tuple[str, ...] | None:
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple, set)):
+        return tuple(str(item) for item in value)
+    raise ValueError("allowed_values must be a list of strings")
+
+
+def select_rule(
+    rules: Iterable[RuleDefinition],
+    *,
+    domain: str,
+    metric: str,
+) -> RuleDefinition | None:
+    candidates = [
+        rule for rule in rules if rule.domain == domain and rule.metric == metric
+    ]
+    if not candidates:
+        return None
+    current = [rule for rule in candidates if rule.is_current]
+    if current:
+        return max(current, key=lambda rule: rule.effective_start_ts)
+    return max(candidates, key=lambda rule: rule.effective_start_ts)

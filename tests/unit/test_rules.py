@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from src.common.rules import DEFAULT_EFFECTIVE_START, RuleDefinition
+from src.common.rules import DEFAULT_EFFECTIVE_START, RuleDefinition, select_rule
 from src.io.rule_loader import load_rule_seed
 
 
@@ -45,3 +45,35 @@ def test_load_rule_seed() -> None:
     rule_ids = {rule.rule_id for rule in rules}
     assert "dq_freshness_default" in rule_ids
     assert "silver_bad_records_default" in rule_ids
+
+
+def test_rule_from_dict_parses_allowed_values() -> None:
+    payload = {
+        "rule_id": "rule_allowed",
+        "allowed_values": ["A", "B"],
+    }
+    rule = RuleDefinition.from_dict(payload)
+    assert rule.allowed_values == ("A", "B")
+
+
+def test_select_rule_prefers_current() -> None:
+    rule_old = RuleDefinition.from_dict(
+        {
+            "rule_id": "old",
+            "domain": "silver",
+            "metric": "bad_records_rate",
+            "effective_start_ts": "2026-01-01T00:00:00Z",
+            "is_current": False,
+        }
+    )
+    rule_new = RuleDefinition.from_dict(
+        {
+            "rule_id": "new",
+            "domain": "silver",
+            "metric": "bad_records_rate",
+            "effective_start_ts": "2026-02-01T00:00:00Z",
+            "is_current": True,
+        }
+    )
+    selected = select_rule([rule_old, rule_new], domain="silver", metric="bad_records_rate")
+    assert selected is rule_new
