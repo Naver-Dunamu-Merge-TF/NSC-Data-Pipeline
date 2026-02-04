@@ -6,12 +6,12 @@
 - `.ref/database_schema`
 
 ## Phase 1 — 리포지토리 골격 + 공통 기반
-- [ ] `src/transforms`, `src/io`, `src/jobs`, `tests/unit`, `tests/integration`, `configs`, `scripts` 디렉터리 생성
-- [ ] 공통 유틸 구현: UTC↔KST 변환, `date_kst` 계산, `[start, end)` 윈도우 유틸
-- [ ] 공통 모델/스키마 정의: 계약 컬럼 목록, 타입 캐스팅 규칙, 필수 컬럼 체크
-- [ ] 룰 로딩 기반 마련: `gold.dim_rule_scd2` 구조, 로컬 시드(`mock_data/fixtures/dim_rule_scd2.json`) 로더
-- [ ] 실행 추적 공통 스펙: `run_id` 생성/전파, `gold.pipeline_state` 인터페이스 정의
-- [ ] Commit
+- [x] `src/transforms`, `src/io`, `src/jobs`, `tests/unit`, `tests/integration`, `configs`, `scripts` 디렉터리 생성
+- [x] 공통 유틸 구현: UTC↔KST 변환, `date_kst` 계산, `[start, end)` 윈도우 유틸
+- [x] 공통 모델/스키마 정의: 계약 컬럼 목록, 타입 캐스팅 규칙, 필수 컬럼 체크
+- [x] 룰 로딩 기반 마련: `gold.dim_rule_scd2` 구조, 로컬 시드(`mock_data/fixtures/dim_rule_scd2.json`) 로더
+- [x] 실행 추적 공통 스펙: `run_id` 생성/전파, `gold.pipeline_state` 인터페이스 정의
+- [x] Commit
 
 ## Phase 2 — Bronze 적재 + Mock 데이터 로더
 - [ ] Bronze 테이블 스펙 정의 및 공통 메타 컬럼(`ingested_at`, `source_extracted_at`, `batch_id`) 부여
@@ -91,11 +91,11 @@
 ## Phase별 산출물 체크리스트
 
 ### Phase 1
-- [ ] 디렉터리 골격 생성 완료
-- [ ] 공통 유틸(UTC↔KST, `date_kst`, 윈도우) 구현
-- [ ] 계약/스키마 유틸 및 필수 컬럼 검증 구현
-- [ ] 룰 로딩(로컬 시드) 동작 확인
-- [ ] `run_id`/`gold.pipeline_state` 인터페이스 정의 완료
+- [x] 디렉터리 골격 생성 완료
+- [x] 공통 유틸(UTC↔KST, `date_kst`, 윈도우) 구현
+- [x] 계약/스키마 유틸 및 필수 컬럼 검증 구현
+- [x] 룰 로딩(로컬 시드) 동작 확인
+- [x] `run_id`/`gold.pipeline_state` 인터페이스 정의 완료
 
 ### Phase 2
 - [ ] Bronze 테이블 스펙 문서화
