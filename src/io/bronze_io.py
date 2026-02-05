@@ -206,7 +206,7 @@ def build_bronze_dataframe(  # pragma: no cover
 
     normalized = normalize_table_name(table_name)
     files = discover_bronze_files(normalized, base_dir=base_dir, file_glob=file_glob)
-    df = spark.read.json([str(path) for path in files.data_files])
+    df = spark.read.json(_to_spark_paths(files.data_files))
     meta = build_bronze_metadata(
         ingested_at=ingested_at,
         source_extracted_at=source_extracted_at,
@@ -223,6 +223,17 @@ def build_bronze_dataframe(  # pragma: no cover
         .withColumn("source_system", F.lit(meta["source_system"]).cast("string"))
     )
     return _cast_dataframe_to_contract(df, get_contract(normalized))
+
+
+def _to_spark_paths(paths: Iterable[Path]) -> list[str]:
+    resolved: list[str] = []
+    for path in paths:
+        path_str = str(path)
+        if path_str.startswith("/dbfs/"):
+            resolved.append(f"dbfs:/{path_str[len('/dbfs/'):]}")
+        else:
+            resolved.append(path_str)
+    return resolved
 
 
 def _cast_dataframe_to_contract(df, contract: TableContract):  # pragma: no cover

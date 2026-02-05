@@ -193,6 +193,25 @@ SILVER_CONTRACTS: dict[str, TableContract] = {
         ),
         description="Product dimension for analytics.",
     ),
+    "silver.dq_status": TableContract(
+        name="silver.dq_status",
+        columns=(
+            ContractColumn("source_table", "string", True),
+            ContractColumn("window_start_ts", "timestamp", True),
+            ContractColumn("window_end_ts", "timestamp", True),
+            ContractColumn("date_kst", "date", True),
+            ContractColumn("freshness_sec", "bigint", False),
+            ContractColumn("event_count", "bigint", True),
+            ContractColumn("dup_rate", "decimal(38,6)", False),
+            ContractColumn("bad_records_rate", "decimal(38,6)", False),
+            ContractColumn("dq_tag", "string", False),
+            ContractColumn("severity", "string", False),
+            ContractColumn("run_id", "string", True),
+            ContractColumn("rule_id", "string", False),
+            ContractColumn("generated_at", "timestamp", True),
+        ),
+        description="Guardrail data quality status per window.",
+    ),
 }
 
 GOLD_CONTRACTS: dict[str, TableContract] = {
@@ -282,6 +301,25 @@ GOLD_CONTRACTS: dict[str, TableContract] = {
             ContractColumn("rule_id", "string", False),
         ),
         description="Ledger pairing quality metrics.",
+    ),
+    "gold.exception_ledger": TableContract(
+        name="gold.exception_ledger",
+        columns=(
+            ContractColumn("date_kst", "date", True),
+            ContractColumn("domain", "string", True),
+            ContractColumn("exception_type", "string", True),
+            ContractColumn("severity", "string", True),
+            ContractColumn("source_table", "string", False),
+            ContractColumn("window_start_ts", "timestamp", False),
+            ContractColumn("window_end_ts", "timestamp", False),
+            ContractColumn("metric", "string", False),
+            ContractColumn("metric_value", "decimal(38,6)", False),
+            ContractColumn("message", "string", False),
+            ContractColumn("run_id", "string", True),
+            ContractColumn("rule_id", "string", False),
+            ContractColumn("generated_at", "timestamp", True),
+        ),
+        description="Unified exception ledger (dq/recon/analytics).",
     ),
 }
 

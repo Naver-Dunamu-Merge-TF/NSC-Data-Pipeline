@@ -112,6 +112,9 @@ Databricks는 결제/지갑 서비스를 “대체”하지 않고, **원장 무
 공통 메타(권장):
 - `ingested_at`(UTC), `source_extracted_at`, `batch_id`, `source_system`
 
+Bronze 스키마(컬럼/타입/필수 여부)는 `.specs/data_contract.md`의
+2장(OLTP → Bronze 계약)을 SSOT로 사용한다.
+
 ### 4.2 Silver(계약/정규화 + 검증)
 
 #### 4.2.1 Silver 계약 핵심(원장/관리자)

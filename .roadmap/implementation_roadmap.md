@@ -14,31 +14,31 @@
 - [x] Commit
 
 ## Phase 2 — Bronze 적재 + Mock 데이터 로더
-- [ ] Bronze 테이블 스펙 정의 및 공통 메타 컬럼(`ingested_at`, `source_extracted_at`, `batch_id`) 부여
-- [ ] 로컬 Mock 데이터 로더 구현: `mock_data/bronze/*` → Bronze staging
-- [ ] Databricks Dev 카탈로그 업로드 스크립트 추가(`scripts/upload_mock_data.py`)
-- [ ] Bronze 적재 IO 인터페이스 확정(파일 덤프 우선)
-- [ ] Bronze 스키마 에볼루션 정책 적용: append-only + `mergeSchema = true`
-- [ ] Commit
+- [x] Bronze 테이블 스펙 정의 및 공통 메타 컬럼(`ingested_at`, `source_extracted_at`, `batch_id`) 부여
+- [x] 로컬 Mock 데이터 로더 구현: `mock_data/bronze/*` → Bronze staging
+- [x] Databricks Dev 카탈로그 업로드 스크립트 추가(`scripts/upload_mock_data.py`)
+- [x] Bronze 적재 IO 인터페이스 확정(파일 덤프 우선)
+- [x] Bronze 스키마 에볼루션 정책 적용: append-only + `mergeSchema = true`
+- [x] Commit
 
 ## Phase 3 — Silver(Controls) 변환 + 계약 검증
-- [ ] `silver.wallet_snapshot` 변환 로직 구현(스냅샷 시각, balance_total 파생)
-- [ ] `silver.ledger_entries` 변환 로직 구현(타입 매핑으로 `amount_signed` 파생)
+- [x] `silver.wallet_snapshot` 변환 로직 구현(스냅샷 시각, balance_total 파생)
+- [x] `silver.ledger_entries` 변환 로직 구현(타입 매핑으로 `amount_signed` 파생)
 - [ ] `date_kst` 파티셔닝 규칙을 Silver 테이블 생성에 반영
-- [ ] 계약 위반 레코드 격리: `silver.bad_records_*` 처리 및 fail-fast 기준 적용
-- [ ] bad_records_rate 계산 + fail-fast 임계치 룰 적용(`gold.dim_rule_scd2`)
-- [ ] 룰 테이블 기반 허용값/임계치 검증 플로우 추가(entry_type, status 등)
+- [x] 계약 위반 레코드 격리: `silver.bad_records_*` 처리 및 fail-fast 기준 적용
+- [x] bad_records_rate 계산 + fail-fast 임계치 룰 적용(`gold.dim_rule_scd2`)
+- [x] 룰 테이블 기반 허용값/임계치 검증 플로우 추가(entry_type, status 등)
 - [ ] Silver 테이블 멱등성 MERGE 키 적용
-- [ ] 단위 테스트 추가: 부호 매핑, 스키마 검증, bad_records 분기
-- [ ] Commit
+- [x] 단위 테스트 추가: 부호 매핑, 스키마 검증, bad_records 분기
+- [x] Commit
 
 ## Phase 4 — Pipeline A (Guardrail DQ)
-- [ ] DQ 메트릭 계산: freshness, completeness, duplicates, contract
-- [ ] `silver.dq_status` 산출 및 `gold.exception_ledger` 기록
-- [ ] 룰 임계치 기반 severity 매핑
-- [ ] `dq_tag` 정책 정의 및 exception_ledger severity 매핑 확정
-- [ ] Job 파라미터 표준(`run_mode`, `start_ts`, `end_ts`, `run_id`) 적용
-- [ ] Commit
+- [x] DQ 메트릭 계산: freshness, completeness, duplicates, contract
+- [x] `silver.dq_status` 산출 및 `gold.exception_ledger` 기록
+- [x] 룰 임계치 기반 severity 매핑
+- [x] `dq_tag` 정책 정의 및 exception_ledger severity 매핑 확정
+- [x] Job 파라미터 표준(`run_mode`, `start_ts`, `end_ts`, `run_id`) 적용
+- [x] Commit
 
 ## Phase 5 — Pipeline B (Ledger & Admin Controls)
 - [ ] 일일 대사: `delta_balance_total` vs `net_flow_total` 계산
@@ -98,25 +98,25 @@
 - [x] `run_id`/`gold.pipeline_state` 인터페이스 정의 완료
 
 ### Phase 2
-- [ ] Bronze 테이블 스펙 문서화
-- [ ] Mock 데이터 로더 동작 확인
-- [ ] Dev 카탈로그 업로드 스크립트 동작 확인
-- [ ] Bronze IO 인터페이스 확정
-- [ ] Bronze 스키마 에볼루션 정책(`mergeSchema=true`) 적용 확인
+- [x] Bronze 테이블 스펙 문서화
+- [x] Mock 데이터 로더 동작 확인
+- [x] Dev 카탈로그 업로드 스크립트 동작 확인
+- [x] Bronze IO 인터페이스 확정
+- [x] Bronze 스키마 에볼루션 정책(`mergeSchema=true`) 적용 확인
 
 ### Phase 3
 - [ ] `silver.wallet_snapshot` 산출 샘플 검증
 - [ ] `silver.ledger_entries.amount_signed` 파생 검증
-- [ ] bad_records 격리 및 fail-fast 임계치 동작 확인
-- [ ] 룰 테이블 기반 허용값/임계치 검증 동작 확인
+- [x] bad_records 격리 및 fail-fast 임계치 동작 확인
+- [x] 룰 테이블 기반 허용값/임계치 검증 동작 확인
 - [ ] Silver `date_kst` 파티셔닝 적용 확인
-- [ ] 단위 테스트 통과
+- [x] 단위 테스트 통과
 
 ### Phase 4
-- [ ] DQ 메트릭 산출 검증
-- [ ] `silver.dq_status`/`gold.exception_ledger` 기록 확인
-- [ ] `dq_tag` 및 severity 매핑 규칙 확정
-- [ ] 표준 파라미터(`run_mode`, `start_ts`, `end_ts`, `run_id`) 적용 확인
+- [x] DQ 메트릭 산출 검증
+- [x] `silver.dq_status`/`gold.exception_ledger` 기록 확인
+- [x] `dq_tag` 및 severity 매핑 규칙 확정
+- [x] 표준 파라미터(`run_mode`, `start_ts`, `end_ts`, `run_id`) 적용 확인
 
 ### Phase 5
 - [ ] `gold.recon_daily_snapshot_flow` 결과 검증

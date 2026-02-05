@@ -67,6 +67,11 @@ python -m pytest tests/unit/ tests/integration/ -v --cov=src --cov-fail-under=80
 
 `pytest-cov`는 커버리지 옵션(`--cov`, `--cov-fail-under`)에 필요합니다.
 
+### 로컬 Mock 데이터 확인
+
+- 로컬 Bronze mock 데이터는 `mock_data/bronze/*`에 저장됩니다.
+- 로컬에서 Bronze 로딩/메타 부여는 `src/io/bronze_io.py`를 사용합니다.
+
 ---
 
 ## 향후 확장

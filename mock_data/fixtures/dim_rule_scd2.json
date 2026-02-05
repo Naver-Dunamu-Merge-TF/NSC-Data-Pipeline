@@ -22,6 +22,28 @@
     "comment": "tx_id duplicate rate threshold."
   },
   {
+    "rule_id": "dq_completeness_zero_windows_v1",
+    "domain": "dq",
+    "metric": "completeness_zero_windows",
+    "threshold": 3,
+    "severity_map": {
+      "warn": 1,
+      "crit": 3
+    },
+    "comment": "Consecutive zero-count windows for completeness."
+  },
+  {
+    "rule_id": "dq_contract_bad_records_default",
+    "domain": "dq",
+    "metric": "contract_bad_records_rate",
+    "threshold": 0.01,
+    "severity_map": {
+      "warn": 0.001,
+      "crit": 0.01
+    },
+    "comment": "Contract violations rate in Guardrail."
+  },
+  {
     "rule_id": "ledger_recon_abs_default",
     "domain": "ledger",
     "metric": "drift_abs",

@@ -5,7 +5,10 @@ import os
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+try:
+    ROOT = Path(__file__).resolve().parents[1]
+except NameError:  # __file__ may be missing in Databricks job context
+    ROOT = Path(os.environ.get("PIPELINE_ROOT", "/dbfs/tmp/data-pipeline"))
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 

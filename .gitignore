@@ -211,3 +211,5 @@ __marimo__/
 .agents/logs/**/*.json
 .agents/logs/**/*.log
 .agents/logs/**/*.txt
+
+.env/

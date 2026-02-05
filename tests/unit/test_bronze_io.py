@@ -75,3 +75,15 @@ def test_prepare_bronze_records_validates_required_columns(
 def test_default_batch_id_prefix() -> None:
     batch_id = bronze_io.default_batch_id("mock")
     assert batch_id.startswith("mock_")
+
+
+def test_prepare_bronze_records_default_base_dir() -> None:
+    records = bronze_io.prepare_bronze_records(
+        "user_wallets_raw",
+        ingested_at="2026-02-01T00:00:00Z",
+        source_extracted_at="2026-02-01T00:00:00Z",
+        batch_id="batch-local",
+        source_system="mock",
+    )
+    assert records
+    assert records[0]["batch_id"] == "batch-local"
