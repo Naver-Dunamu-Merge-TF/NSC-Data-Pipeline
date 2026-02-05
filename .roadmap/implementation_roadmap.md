@@ -41,13 +41,13 @@
 - [x] Commit
 
 ## Phase 5 — Pipeline B (Ledger & Admin Controls)
-- [ ] 일일 대사: `delta_balance_total` vs `net_flow_total` 계산
-- [ ] 총량 정합성: `issued_supply` vs `wallet_total_balance` 계산
-- [ ] 게이팅 적용: Pipeline A 결과에 따른 알림 억제/태그 처리
-- [ ] 룰 테이블 기반 drift/supply 임계치 적용 및 exception severity 결정
-- [ ] `gold.recon_daily_snapshot_flow`, `gold.ledger_supply_balance_daily` 작성
-- [ ] 운영 지표: `gold.ops_payment_failure_daily`, `gold.ops_ledger_pairing_quality_daily`
-- [ ] (옵션) `gold.admin_tx_search` 배치 인덱스
+- [x] 일일 대사: `delta_balance_total` vs `net_flow_total` 계산
+- [x] 총량 정합성: `issued_supply` vs `wallet_total_balance` 계산
+- [x] 게이팅 적용: Pipeline A 결과에 따른 알림 억제/태그 처리
+- [x] 룰 테이블 기반 drift/supply 임계치 적용 및 exception severity 결정
+- [x] `gold.recon_daily_snapshot_flow`, `gold.ledger_supply_balance_daily` 작성
+- [x] 운영 지표: `gold.ops_payment_failure_daily`, `gold.ops_ledger_pairing_quality_daily`
+- [x] (옵션) `gold.admin_tx_search` 배치 인덱스
 - [ ] 통합 테스트 추가: recon/supply 결과 및 멱등성
 - [ ] Commit
 
@@ -119,12 +119,12 @@
 - [x] 표준 파라미터(`run_mode`, `start_ts`, `end_ts`, `run_id`) 적용 확인
 
 ### Phase 5
-- [ ] `gold.recon_daily_snapshot_flow` 결과 검증
-- [ ] `gold.ledger_supply_balance_daily` 결과 검증
-- [ ] 게이팅(알림 억제/태그) 동작 확인
-- [ ] 룰 기반 drift/supply 임계치 적용 확인
-- [ ] 운영 지표 2종 산출 검증
-- [ ] (옵션) `gold.admin_tx_search` 산출 여부 결정
+- [x] `gold.recon_daily_snapshot_flow` 결과 검증
+- [x] `gold.ledger_supply_balance_daily` 결과 검증
+- [x] 게이팅(알림 억제/태그) 동작 확인
+- [x] 룰 기반 drift/supply 임계치 적용 확인
+- [x] 운영 지표 2종 산출 검증
+- [x] (옵션) `gold.admin_tx_search` 산출 여부 결정
 - [ ] 통합 테스트 통과
 
 ### Phase 6
