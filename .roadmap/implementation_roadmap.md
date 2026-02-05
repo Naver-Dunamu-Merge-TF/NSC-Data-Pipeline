@@ -105,8 +105,8 @@
 - [x] Bronze 스키마 에볼루션 정책(`mergeSchema=true`) 적용 확인
 
 ### Phase 3
-- [ ] `silver.wallet_snapshot` 산출 샘플 검증
-- [ ] `silver.ledger_entries.amount_signed` 파생 검증
+- [x] `silver.wallet_snapshot` 산출 샘플 검증
+- [x] `silver.ledger_entries.amount_signed` 파생 검증
 - [x] bad_records 격리 및 fail-fast 임계치 동작 확인
 - [x] 룰 테이블 기반 허용값/임계치 검증 동작 확인
 - [x] Silver `date_kst` 파티셔닝 적용 확인
