@@ -48,8 +48,8 @@
 - [x] `gold.recon_daily_snapshot_flow`, `gold.ledger_supply_balance_daily` 작성
 - [x] 운영 지표: `gold.ops_payment_failure_daily`, `gold.ops_ledger_pairing_quality_daily`
 - [x] (옵션) `gold.admin_tx_search` 배치 인덱스
-- [ ] 통합 테스트 추가: recon/supply 결과 및 멱등성
-- [ ] Commit
+- [x] 통합 테스트 추가: recon/supply 결과 및 멱등성
+- [x] Commit
 
 ## Phase 6 — Silver(Analytics) + Pipeline C
 - [ ] `silver.order_events`, `silver.order_items`, `silver.products` 변환 구현
@@ -125,7 +125,7 @@
 - [x] 룰 기반 drift/supply 임계치 적용 확인
 - [x] 운영 지표 2종 산출 검증
 - [x] (옵션) `gold.admin_tx_search` 산출 여부 결정
-- [ ] 통합 테스트 통과
+- [x] 통합 테스트 통과
 
 ### Phase 6
 - [ ] `silver.order_events/order_items/products` 산출 검증
