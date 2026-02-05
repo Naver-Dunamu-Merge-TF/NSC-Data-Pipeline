@@ -8,30 +8,23 @@ Controls-first Ledger Pipelines codebase.
 Project overview
 ----------------
 
-Controls-first Ledger Pipelines on Azure Databricks is a data quality and
-reconciliation system. The project builds **controls** (not analytics) to
-detect data issues and verify ledger integrity.
+Controls-first Ledger Pipelines on Azure Databricks for data quality and
+reconciliation (controls-first, not analytics).
 
-**Pipelines:**
- -  **A (Guardrail)**: Data freshness/completeness (10-min micro-batch)
- -  **B (Ledger & Admin Controls)**: Snapshot-Flow reconciliation (`delta = net_flow`)
- -  **C (Analytics)**: Anonymized payment data loading
+Pipelines:
+- A (Guardrail): freshness/completeness/duplicates, 10-min micro-batch
+- B (Ledger/Admin): daily recon (`delta = net_flow`) + supply checks
+- C (Analytics): anonymized payment marts
 
-**Key principle:** Pipeline A detects data quality issues first, enabling
-B/C results to be interpreted correctly (gating policy).
-
-**Current phase:** Mock data-based development. Source DB under development.
+Key principle: Pipeline A gates B/C (stale/drop suppresses alerts).
+Current phase: mock data-based development.
 
 
 Development environment
 -----------------------
 
- -  Development: **Local IDE + remote Databricks execution** (Option B)
- -  Language: Python (PySpark)
- -  Local testing: pytest with mock DataFrames
- -  Remote testing: Databricks Dev cluster E2E
- -  Orchestration: Databricks Workflows (Jobs)
- -  Storage: Delta Lake on Azure
+Local IDE + remote Databricks execution (Option B), Python (PySpark),
+pytest locally, Databricks Dev E2E, Delta Lake on Azure.
 
 
 Repository structure
@@ -54,63 +47,18 @@ Repository structure
 Core domain concepts
 --------------------
 
-### Data layers
-
- -  **Bronze**: Flexible ingestion (raw, audit-ready)
- -  **Silver**: Contract enforcement (validation, fail-fast)
- -  **Gold**: Schema stability (operational consumption)
-
-### Data contracts
-
-See `.specs/data_contract.md` for full schemas:
-
-**Ledger/Admin (Controls):**
- -  `user_wallets`: User wallet balance snapshots
- -  `transaction_ledger`: Ledger transaction events (flows)
- -  `payment_orders`: Payment order records
-
-**Commerce (Analytics):**
- -  `orders`: Commerce orders
- -  `order_items`: Order line items
- -  `products`: Product catalog
-
-### Source mapping
-
-Source DB schema differs from contract schema. Bronze->Silver transform
-applies mapping rules (column rename, derivation, type casting).
-See `data_contract.md` section 5.
+Data layers: Bronze (raw), Silver (contract + validation), Gold (stable).
+Schemas, mappings, and table definitions live in `.specs/data_contract.md`.
 
 
 Code patterns and principles
 ----------------------------
 
-### 1. Transform / IO / Jobs separation
-
- -  **Transforms**: Pure functions, no Spark session, testable locally
- -  **IO**: Readers/writers, Delta/DB connections
- -  **Jobs**: Wires transforms + IO
-
-### 2. Idempotency (required)
-
- -  Use `MERGE` with defined keys for upserts
- -  Use `overwrite partition` for daily snapshots
- -  Same input -> same output
- -  Silver/Gold: partitioned by `date_kst` (Hive style)
-
-### 3. Contract-based validation
-
-Silver layer enforces data contracts. Bad records go to quarantine tables
-(`silver.bad_records_*`). Fail-fast if bad rate exceeds threshold.
-
-### 4. Rule versioning
-
-All thresholds in `gold.dim_rule_scd2`. Never hardcode.
-All outputs include `rule_id`. Changes = version bump.
-
-### 5. Run tracking
-
-Every execution: unique `run_id`, recorded in all outputs,
-update `gold.pipeline_state` on success.
+- Transform/IO/Jobs separation (pure transforms; IO handles Delta/DB; jobs wire both)
+- Idempotency required: MERGE keys, overwrite partitions; Silver/Gold partition by `date_kst`
+- Contract validation + quarantine (`silver.bad_records_*`), fail-fast on bad rate
+- Rule versioning via `gold.dim_rule_scd2` (no hardcoded thresholds), outputs include `rule_id`
+- Run tracking: `run_id` propagated, update `gold.pipeline_state`
 
 
 Common job parameters
@@ -127,60 +75,14 @@ All pipelines accept these standard parameters:
 Pipelines overview
 ------------------
 
-### Pipeline A: Guardrail
-
-10-minute micro-batch monitoring freshness, completeness, duplicates.
-Output: `silver.dq_status`. Exceptions: `SOURCE_STALE`, `EVENT_DROP_SUSPECTED`.
-
-### Pipeline B: Ledger & Admin Controls
-
-Verifies `delta_balance = net_flow` per window. Tags results with A status.
-If A shows issues, B alerts suppressed. Output: `gold.recon_daily_snapshot_flow`.
-Also checks supply vs wallet balance: `gold.ledger_supply_balance_daily`.
-
-### Pipeline C: Analytics
-
-Daily anonymized data loading for analysis. Pseudonymization via user_key.
-Output: `gold.fact_payment_anonymized`. PII excluded.
-
-See `.specs/project_specs.md` sections 5-6 for pipeline specifications.
+Pipeline A: Guardrail DQ → `silver.dq_status` + exceptions  
+Pipeline B: Recon/supply checks → `gold.recon_daily_snapshot_flow`, `gold.ledger_supply_balance_daily`  
+Pipeline C: Anonymized analytics → `gold.fact_payment_anonymized`  
+Details: `.specs/project_specs.md` sections 5-6.
 
 
-Key tables
-----------
-
-**Silver (Contract enforcement):**
- -  `silver.wallet_snapshot`: Point-in-time wallet balance snapshots
- -  `silver.ledger_entries`: Standardized ledger entries with amount_signed
- -  `silver.dq_status`: Data quality metrics
- -  `silver.order_events`: Standardized order/payment events
- -  `silver.order_items`: Order line items (analytics)
- -  `silver.products`: Product dimension (analytics)
-
-**Gold (Controls output):**
- -  `gold.recon_daily_snapshot_flow`: Reconciliation results (delta = net_flow)
- -  `gold.ledger_supply_balance_daily`: Supply vs wallet balance check
- -  `gold.exception_ledger`: Unified exception log (domain: dq/recon/analytics)
- -  `gold.pipeline_state`: Execution state tracking
- -  `gold.dim_rule_scd2`: Rule/threshold versioning
-
-**Gold (Operational metrics):**
- -  `gold.ops_payment_failure_daily`: Payment failure rate by merchant
- -  `gold.ops_ledger_pairing_quality_daily`: Ledger entry pairing quality
-
-**Gold (Analytics):**
- -  `gold.fact_payment_anonymized`: Anonymized payment analytics
- -  `gold.admin_tx_search`: (Optional) tx_id batch index for audit
-
-
-Decision defaults
------------------
-
- -  **Time**: Storage/calc in UTC, day boundary in KST
- -  **Window**: `[start, end)` - start inclusive, end exclusive
- -  **Amount sign**: Derived from entry_type mapping (see `data_contract.md` section 5.2.1)
-
-Full defaults and thresholds: `.specs/project_specs.md` section 7 and Appendix.
+Key tables and decision defaults live in `.specs/data_contract.md` and
+`.specs/project_specs.md` (section 7).
 
 
 Testing strategy
@@ -281,5 +183,6 @@ Key references
 Decision hygiene
 ----------------
 
-- 구현 중 **명확히 결정되지 않았거나 가정으로 처리한 부분**이 생기면
-  `.specs/decision_open_items.md`에 **즉시 추가**하고, 결정되면 상태를 갱신한다.
+- If any part of the implementation is unclear or handled as an assumption,
+  add it to `.specs/decision_open_items.md` immediately and update its status
+  once a decision is made.
