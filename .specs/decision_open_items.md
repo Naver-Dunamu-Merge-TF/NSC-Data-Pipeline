@@ -91,3 +91,21 @@
 - 영향: 테이블 파티션 전략, 백필 단위
 - 결정 필요: 분석 요구에 따라 파티션 컬럼 추가 여부
 - 제안: 필요 시 `snapshot_date_kst` 등 보강 후 파티셔닝 검토
+
+### D-014 Analytics `salt` Secret Scope/Key 정의
+- 현재 상태: Secret Scope 이름과 `salt` 키가 미정
+- 영향: `user_key` 익명화 구현 및 배포 환경 설정
+- 결정 필요: Secret Scope 이름, `salt` 키명, 운영/개발 분리 여부
+- 제안: `scope=ledger-analytics`, `key=salt_user_key` 같은 고정 규칙으로 통일
+
+### D-015 로컬 더미 `salt` 값
+- 현재 상태: 로컬 실행 시 사용할 더미 `salt` 값 미정
+- 영향: 로컬 테스트 재현성
+- 결정 필요: 고정 더미 문자열(예: `local-salt`) 여부
+- 제안: 테스트 고정성을 위해 문서화된 상수값 사용
+
+### D-016 `gold.fact_payment_anonymized` 멱등성/파티셔닝 전략
+- 현재 상태: `date_kst` 파티션 적용은 가능하나, `MERGE` 키/overwrite 규칙 미정
+- 영향: 백필/재실행 시 결과 수렴 방식
+- 결정 필요: `overwrite partition(date_kst)` vs `MERGE` 키(예: `date_kst`,`user_key`,`merchant_name`) 확정
+- 제안: 배치 단위가 명확하면 `overwrite partition(date_kst)` 우선
