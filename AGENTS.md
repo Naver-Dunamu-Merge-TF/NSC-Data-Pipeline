@@ -276,3 +276,10 @@ Key references
 |----------|---------|
 | `.specs/project_specs.md` | Full development plan, Decision Lock, thresholds |
 | `.specs/data_contract.md` | Data contracts, schemas, mapping rules |
+| `.specs/decision_open_items.md` | Open decisions and implementation assumptions |
+
+Decision hygiene
+----------------
+
+- 구현 중 **명확히 결정되지 않았거나 가정으로 처리한 부분**이 생기면
+  `.specs/decision_open_items.md`에 **즉시 추가**하고, 결정되면 상태를 갱신한다.
