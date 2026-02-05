@@ -72,3 +72,22 @@
 - 영향: `gold.recon_daily_snapshot_flow.drift_pct`
 - 결정 필요: 0 분모 처리(0/NULL/별도 규칙)
 - 제안: NULL 유지 (분모 0 의미 왜곡 방지)
+
+### D-011 `gold.fact_payment_anonymized.category` 다중 아이템 처리
+- 현재 가정: `order_ref` 기준 `order_items` 중 **line_amount(= price_at_purchase * quantity)**가 가장 큰 아이템의 `products.category`를 선택
+- tie-break: line_amount 동일 시 **가장 작은 `item_id`** 사용
+- 영향: `gold.fact_payment_anonymized.category`
+- 결정 필요: 다중 카테고리 집계/대표값 산정 규칙 확정
+- 제안: 운영 요구가 없으면 현재 규칙 유지
+
+### D-012 `gold.fact_payment_anonymized` 소스 필터
+- 현재 가정: `silver.order_events` 중 `order_source = PAYMENT_ORDERS`만 팩트로 사용
+- 영향: 결제 팩트의 중복 방지, 주문 이벤트 제외
+- 결정 필요: `ORDERS` 이벤트 포함 여부
+- 제안: 결제 지표 목적이라면 `PAYMENT_ORDERS` 유지
+
+### D-013 Silver Analytics 파티셔닝
+- 현재 가정: `silver.order_items`, `silver.products`는 `date_kst` 컬럼이 없어 **파티션 없음**
+- 영향: 테이블 파티션 전략, 백필 단위
+- 결정 필요: 분석 요구에 따라 파티션 컬럼 추가 여부
+- 제안: 필요 시 `snapshot_date_kst` 등 보강 후 파티셔닝 검토

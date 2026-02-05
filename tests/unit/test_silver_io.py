@@ -12,6 +12,7 @@ from src.io.silver_io import (
 
 def test_normalize_table_name_accepts_short_name() -> None:
     assert normalize_table_name("wallet_snapshot") == "silver.wallet_snapshot"
+    assert normalize_table_name("order_events") == "silver.order_events"
 
 
 def test_silver_partition_columns() -> None:
@@ -19,11 +20,15 @@ def test_silver_partition_columns() -> None:
         "snapshot_date_kst",
     )
     assert silver_partition_columns("ledger_entries") == ("event_date_kst",)
+    assert silver_partition_columns("order_events") == ("event_date_kst",)
+    assert silver_partition_columns("silver.order_items") == ()
 
 
 def test_silver_merge_keys() -> None:
     assert silver_merge_keys("wallet_snapshot") == ("snapshot_ts", "user_id")
     assert silver_merge_keys("silver.ledger_entries") == ("tx_id", "wallet_id")
+    assert silver_merge_keys("order_events") == ("order_ref", "order_source")
+    assert silver_merge_keys("silver.order_items") == ("item_id",)
 
 
 def test_silver_write_config() -> None:
