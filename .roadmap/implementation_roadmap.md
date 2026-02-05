@@ -52,10 +52,10 @@
 - [x] Commit
 
 ## Phase 6 — Silver(Analytics) + Pipeline C
-- [ ] `silver.order_events`, `silver.order_items`, `silver.products` 변환 구현
+- [x] `silver.order_events`, `silver.order_items`, `silver.products` 변환 구현
 - [ ] PII 제거 및 `user_key` 익명화 처리(Secret Scope 기반, 로컬은 더미 값)
 - [ ] `gold.fact_payment_anonymized` 산출 및 파티셔닝 적용
-- [ ] 단위 테스트: 익명화, 조인 기반 `category` 파생
+- [x] 단위 테스트: 익명화, 조인 기반 `category` 파생
 - [ ] Commit
 
 ## Phase 7 — Cloud/Platform Setup (Azure + Databricks)
@@ -128,10 +128,10 @@
 - [x] 통합 테스트 통과
 
 ### Phase 6
-- [ ] `silver.order_events/order_items/products` 산출 검증
+- [x] `silver.order_events/order_items/products` 산출 검증
 - [ ] `user_key` 익명화 동작 확인(Secret Scope/로컬 더미)
 - [ ] `gold.fact_payment_anonymized` 파티셔닝 적용 확인
-- [ ] 단위 테스트 통과
+- [x] 단위 테스트 통과
 
 ### Phase 7
 - [ ] ADLS Gen2 경로/컨테이너 구조 확정
