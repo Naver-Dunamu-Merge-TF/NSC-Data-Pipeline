@@ -19,12 +19,6 @@ Good: `User input was causing database errors with special characters`
 Bad: `Fix crash reported in #456`
 Good: `Fix crash when loading large files` + URL in body
 
-**4. AI Credit** — Add `Co-Authored-By:` trailer when AI assisted.
-
-```
-Co-Authored-By: Claude <noreply@anthropic.com>
-```
-
 ## Example
 
 ```
@@ -35,5 +29,4 @@ creating duplicate records.
 
 https://github.com/org/repo/issues/789
 
-Co-Authored-By: Claude <noreply@anthropic.com>
 ```
