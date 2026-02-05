@@ -24,11 +24,11 @@
 ## Phase 3 — Silver(Controls) 변환 + 계약 검증
 - [x] `silver.wallet_snapshot` 변환 로직 구현(스냅샷 시각, balance_total 파생)
 - [x] `silver.ledger_entries` 변환 로직 구현(타입 매핑으로 `amount_signed` 파생)
-- [ ] `date_kst` 파티셔닝 규칙을 Silver 테이블 생성에 반영
+- [x] `date_kst` 파티셔닝 규칙을 Silver 테이블 생성에 반영
 - [x] 계약 위반 레코드 격리: `silver.bad_records_*` 처리 및 fail-fast 기준 적용
 - [x] bad_records_rate 계산 + fail-fast 임계치 룰 적용(`gold.dim_rule_scd2`)
 - [x] 룰 테이블 기반 허용값/임계치 검증 플로우 추가(entry_type, status 등)
-- [ ] Silver 테이블 멱등성 MERGE 키 적용
+- [x] Silver 테이블 멱등성 MERGE 키 적용
 - [x] 단위 테스트 추가: 부호 매핑, 스키마 검증, bad_records 분기
 - [x] Commit
 
@@ -109,7 +109,7 @@
 - [ ] `silver.ledger_entries.amount_signed` 파생 검증
 - [x] bad_records 격리 및 fail-fast 임계치 동작 확인
 - [x] 룰 테이블 기반 허용값/임계치 검증 동작 확인
-- [ ] Silver `date_kst` 파티셔닝 적용 확인
+- [x] Silver `date_kst` 파티셔닝 적용 확인
 - [x] 단위 테스트 통과
 
 ### Phase 4
