@@ -60,14 +60,15 @@
 
 ## Phase 7 — Cloud/Platform Setup (Azure + Databricks)
 - [ ] (운영 이관 전 재구축) 보안 하드닝: NSG/서브넷 분리/Private Endpoint/시크릿 경로 강화
-- [ ] (개발 단계 임시정책) 기능 검증 목적의 최소 구성 유지(퍼블릭 엔드포인트 허용)
-- [ ] Azure 스토리지 준비: ADLS Gen2 컨테이너/경로 설계 및 네이밍 규칙 정의
-- [ ] Key Vault/Secret Scope 설정: `salt`, DB 연결, 토큰 등 시크릿 관리
-- [ ] Databricks Workspace/Unity Catalog 준비: 메타스토어, 카탈로그/스키마 생성
-- [ ] Storage Credential + External Location 설정(UC 기반)
-- [ ] 서비스 프린시플/권한 부여: 카탈로그, 스키마, 테이블 ACL
-- [ ] 클러스터 정책/기본 클러스터 템플릿 정의(DBR 버전, 자동 종료, 태그)
-- [ ] Workflows 알림 채널 연동(Slack/Email) 및 재시도 정책 정의
+- [x] (개발 단계 임시정책) 기능 검증 목적의 최소 구성 유지(퍼블릭 엔드포인트 허용)
+- [x] Azure 스토리지 준비: ADLS Gen2 컨테이너/경로 설계 및 네이밍 규칙 정의
+- [x] Key Vault/Secret Scope 설정: `salt`, DB 연결, 토큰 등 시크릿 관리(개발 임시: Databricks-backed Secret Scope)
+- [x] Databricks Workspace/Unity Catalog 준비: 메타스토어, 카탈로그/스키마 생성
+- [x] Storage Credential + External Location 설정(UC 기반)
+- [ ] 서비스 프린시플/권한 부여: 카탈로그, 스키마, 테이블 ACL(임시로 사용자 ACL 적용, 서비스 프린시플은 유예)
+- [x] 클러스터 정책/기본 클러스터 템플릿 정의(DBR 버전, 자동 종료, 태그)
+- [x] Workflows 알림 채널 연동(Slack/Email) 및 재시도 정책 정의(Email+Retry 우선 적용)
+- [x] Phase 7 설정/점검 스크립트 추가(`scripts/phase7/setup_minimal_cloud.sh`, `scripts/phase7/audit_cloud_state.sh`)
 - [ ] Commit
 
 ## Phase 8 — Job Wiring + 환경 설정
@@ -136,13 +137,13 @@
 - [x] 단위 테스트 통과
 
 ### Phase 7
-- [ ] ADLS Gen2 경로/컨테이너 구조 확정
-- [ ] Key Vault/Secret Scope 시크릿 등록 확인
-- [ ] Unity Catalog 메타스토어/카탈로그/스키마 생성 확인
-- [ ] Storage Credential/External Location 설정 확인
-- [ ] 서비스 프린시플 권한 부여 확인
-- [ ] 클러스터 정책/템플릿 정의 완료
-- [ ] Workflows 알림/재시도 정책 설정 완료
+- [x] ADLS Gen2 경로/컨테이너 구조 확정
+- [x] Key Vault/Secret Scope 시크릿 등록 확인(개발 임시: Databricks-backed Scope)
+- [x] Unity Catalog 메타스토어/카탈로그/스키마 생성 확인
+- [x] Storage Credential/External Location 설정 확인
+- [ ] 서비스 프린시플 권한 부여 확인(유예)
+- [x] 클러스터 정책/템플릿 정의 완료
+- [x] Workflows 알림/재시도 정책 설정 완료(Email+Retry)
 
 ### Phase 8
 - [ ] `gold.pipeline_state` 갱신 규칙 구현 확인
