@@ -97,6 +97,7 @@
 - [ ] 보안 하드닝: NSG/서브넷 분리/Private Endpoint/네트워크 경로 강화
 - [ ] Key Vault + Key Vault-backed Secret Scope 구성
 - [ ] 서비스 프린시플 기반 `run_as`/권한 모델 전환(UC ACL 포함)
+- 정책: D-018에 따라 `run_as` 전환은 보안 설정된 신규 리소스 준비 완료 후(Phase 11) 진행
 - [ ] Secure Workspace/UC 오브젝트 프로비저닝 자동화 스크립트 확정
 - [ ] 신규 환경 E2E 스모크(L3) 통과
 - [ ] Commit
@@ -192,7 +193,7 @@
 ### Phase 11
 - [ ] 보안 하드닝 인프라 생성 완료(NSG/서브넷/Private Endpoint)
 - [ ] Key Vault-backed Secret Scope 구성 완료
-- [ ] 서비스 프린시플 기반 실행 주체/권한 모델 전환 완료
+- [ ] 서비스 프린시플 기반 실행 주체/권한 모델 전환 완료 (D-018: 보안 리소스 준비 완료 후 착수)
 - [ ] Secure Workspace/UC 자동화 스크립트 검증 완료
 - [ ] 신규 환경 E2E 스모크(L3) 통과
 

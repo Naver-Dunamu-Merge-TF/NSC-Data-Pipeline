@@ -14,83 +14,87 @@
 ## 결정 필요 항목
 
 ### D-001 `user_id` ↔ `wallet_id` 매핑 기준
+- 상태: **협의 필요(외부 SSOT 확인)**
 - 현재 가정: `user_id == wallet_id`로 취급
 - 영향: `gold.recon_daily_snapshot_flow`의 `user_id` 기준 대사 결과
 - 결정 필요: 실제 매핑 테이블 존재 여부 및 SSOT
 - 제안: 매핑 테이블 생기면 즉시 치환, 그 전까지는 동일 키 가정 유지
 
 ### D-002 일일 스냅샷 start/end 선택 규칙
+- 상태: **협의 필요(외부 SSOT 확인)**
 - 현재 가정: 대상 `date_kst` 내 **최소/최대 `snapshot_ts`**를 start/end로 사용
 - 영향: `delta_balance_total` 계산
 - 결정 필요: “일자 내 첫/마지막 스냅샷” vs “정해진 cutoff 시각” 규칙
 - 제안: 샘플 데이터/운영 수집 주기 확인 후 규칙 고정
 
 ### D-003 `issued_supply` 산정 SSOT
+- 상태: **협의 필요(외부 SSOT 확인)**
 - 현재 가정: 원장 타입(MINT/CHARGE/BURN/WITHDRAW) 합산
 - 영향: `gold.ledger_supply_balance_daily` 결과
 - 결정 필요: OLTP 발행량 스냅샷 테이블 존재 시 전환 여부
 - 제안: OLTP 스냅샷이 있으면 SSOT로 즉시 전환
 
 ### D-004 게이팅 처리 정책
-- 현재 가정: Pipeline A가 stale/drop이면 **CRITICAL → WARN 다운그레이드**
-- 영향: `gold.exception_ledger` severity
-- 결정 필요: **severity 유지 + 알림 억제**로 바꿀지 여부
-- 제안: 운영 알림 정책이 확정되면 severity 정책을 고정
+- 상태: **결정됨(2026-02-06)**
+- 결정: Pipeline A가 stale/drop이어도 `gold.exception_ledger.severity`는 원본 등급을 유지하고, 알림 채널에서만 억제한다.
+- 영향: 예외 심각도 의미를 보존하면서 운영 알림 노이즈를 제어한다.
+- 근거: 운영 관측/감사 정확도 우선 정책
 
 ### D-005 Drift/공급 차이 임계치 비교 방식
-- 현재 가정: `value > threshold` (경계값은 경보 아님)
-- 영향: `drift_abs`, `supply_diff_abs` 경보
-- 결정 필요: `>` vs `>=` 규칙 고정
-- 제안: 임계치가 0인 경우 과경보 방지를 위해 `>` 유지
+- 상태: **결정됨(2026-02-06)**
+- 결정: 임계치 비교는 `value > threshold`를 사용한다.
+- 영향: 경계값 도달만으로 과경보가 발생하지 않도록 한다.
+- 근거: 임계치 0 구간에서 노이즈 억제
 
 ### D-006 결제 실패 status 집합
-- 현재 가정: `FAILED`, `CANCELLED`
-- 영향: `gold.ops_payment_failure_daily.failed_cnt`
-- 결정 필요: 실패 정의를 룰 테이블에 공식화
-- 제안: `gold.dim_rule_scd2`에 실패 상태 목록 추가
+- 상태: **결정됨(2026-02-06)**
+- 결정: 실패 지표(`gold.ops_payment_failure_daily.failed_cnt`)는 `FAILED`, `CANCELLED`만 포함한다.
+- 보완: `REFUNDED`는 실패율과 분리된 별도 지표로 관리한다(동일 Pipeline B 내 추가 산출물로 처리, 신규 파이프라인 불필요).
+- 영향: 실패율 의미를 유지하면서 환불 추세를 별도로 관찰 가능
+- 근거: 운영 지표 해석 분리 원칙
 
 ### D-007 페어링 품질 지표 정의
-- 현재 가정: `related_id` 그룹 크기 2 + 서로 다른 `wallet_id`를 pair 후보로 계산
-- 영향: `gold.ops_ledger_pairing_quality_daily.pair_candidate_rate`
-- 결정 필요: 페어링 규칙 확정(실데이터 기준)
-- 제안: 운영 데이터로 분포 확인 후 규칙 고정
+- 상태: **결정됨(2026-02-06)**
+- 결정: `related_id` 그룹 크기 2 + 서로 다른 `wallet_id`인 경우만 pair 후보로 계산한다.
+- 영향: 규칙 단순성과 재현성을 우선하며, 운영 대시보드 해석 일관성을 확보한다.
+- 근거: 현 단계의 최소 안정 규칙 고정
 
 ### D-008 `ledger_entries` 멱등성 키 확장 여부
-- 현재 가정: `(tx_id, wallet_id)` MERGE
-- 영향: 중복 tx_id 발생 시 멱등성 붕괴 가능
-- 결정 필요: `entry_seq` 등 보조 키 필요 여부
-- 제안: tx_id 다중 엔트리 발생 여부 확인 후 확장
+- 상태: **협의 필요(명세 확인 후 확정)**
+- 현재 결정 초안: `silver.ledger_entries` 멱등성 키를 `(tx_id, wallet_id, entry_seq)`로 확장
+- 확인 필요: 업스트림 `entry_seq` 제공 여부 또는 deterministic 파생 규칙
+- 영향: 동일 `tx_id` 다중 엔트리 케이스 재실행 수렴 보장
+- 후속: 외부 명세/담당자 확인 후 `결정됨`으로 전환하고 `contracts/table_metadata/transforms/tests` 반영
 
 ### D-009 completeness 연속 0 윈도우 상태 저장
-- 현재 가정: `previous_zero_windows=0` (상태 미연결)
-- 영향: `completeness_zero_windows` 계산 정확도
-- 결정 필요: 상태 저장 위치(`gold.pipeline_state` 또는 `silver.dq_status` 기반)
-- 제안: `gold.pipeline_state`에 per-table window 카운터 저장
+- 상태: **결정됨(2026-02-06)**
+- 결정: `gold.pipeline_state`에 `source_table`별 연속 0 윈도우 카운터를 저장/갱신한다.
+- 영향: 실행 간 completeness 상태 연속성을 보장하고, 누적 경보 정확도를 높인다.
+- 근거: 상태 저장 일관성 우선 정책
 
 ### D-010 `drift_pct` 분모 0 처리
-- 현재 가정: `net_flow_total == 0`이면 `drift_pct = NULL`
-- 영향: `gold.recon_daily_snapshot_flow.drift_pct`
-- 결정 필요: 0 분모 처리(0/NULL/별도 규칙)
-- 제안: NULL 유지 (분모 0 의미 왜곡 방지)
+- 상태: **결정됨(2026-02-06)**
+- 결정: `net_flow_total == 0`이면 `drift_pct = NULL`로 유지한다.
+- 영향: 분모 0 구간의 의미 왜곡을 방지하고 지표 해석을 명확히 유지한다.
+- 근거: 수학적 정의 불가 구간은 NULL 표현 원칙
 
 ### D-011 `gold.fact_payment_anonymized.category` 다중 아이템 처리
-- 현재 가정: `order_ref` 기준 `order_items` 중 **line_amount(= price_at_purchase * quantity)**가 가장 큰 아이템의 `products.category`를 선택
-- tie-break: line_amount 동일 시 **가장 작은 `item_id`** 사용
-- 영향: `gold.fact_payment_anonymized.category`
-- 결정 필요: 다중 카테고리 집계/대표값 산정 규칙 확정
-- 제안: 운영 요구가 없으면 현재 규칙 유지
+- 상태: **결정됨(2026-02-06)**
+- 결정: `order_ref` 기준 `order_items` 중 line_amount가 가장 큰 아이템의 `products.category`를 대표값으로 사용하고, 동률이면 가장 작은 `item_id`를 선택한다.
+- 영향: 단일 카테고리 스키마를 유지해 분석/집계 단순성을 확보한다.
+- 근거: 현 단계 팩트 스키마 단순화 우선
 
 ### D-012 `gold.fact_payment_anonymized` 소스 필터
-- 현재 가정: `silver.order_events` 중 `order_source = PAYMENT_ORDERS`만 팩트로 사용
-- 영향: 결제 팩트의 중복 방지, 주문 이벤트 제외
-- 결정 필요: `ORDERS` 이벤트 포함 여부
-- 제안: 결제 지표 목적이라면 `PAYMENT_ORDERS` 유지
+- 상태: **결정됨(2026-02-06)**
+- 결정: `silver.order_events` 중 `order_source = PAYMENT_ORDERS`만 `gold.fact_payment_anonymized`에 포함한다.
+- 영향: 결제 이벤트 중심 팩트 정의를 유지하고 중복 위험을 줄인다.
+- 근거: 결제 지표 목적의 스코프 고정
 
 ### D-013 Silver Analytics 파티셔닝
-- 현재 가정: `silver.order_items`, `silver.products`는 `date_kst` 컬럼이 없어 **파티션 없음**
-- 영향: 테이블 파티션 전략, 백필 단위
-- 결정 필요: 분석 요구에 따라 파티션 컬럼 추가 여부
-- 제안: 필요 시 `snapshot_date_kst` 등 보강 후 파티셔닝 검토
+- 상태: **결정됨(2026-02-06)**
+- 결정: `silver.order_items`, `silver.products`는 현재 단계에서 파티션 없이 유지한다.
+- 영향: 스키마/운영 복잡도를 낮추고, 데이터 규모 증가 시 파티션 컬럼 보강 후 재평가한다.
+- 근거: 초기 단계 단순화 + 단계적 최적화 원칙
 
 ### D-014 Analytics `salt` Secret Scope/Key 정의
 - 상태: **결정됨(2026-02-06, dev 임시 기준)**
@@ -119,10 +123,10 @@
 - 근거: 사용자 결정 및 `.specs/cloud_migration_rebuild_plan.md`
 
 ### D-018 서비스 프린시플 실행 주체 전환 시점
-- 현재 상태: Phase 7에서는 사용자 principal(`2dt026@msacademy.msai.kr`) ACL로 임시 운영 중
-- 영향: 운영 이관 시 잡 실행 주체/권한 일관성
-- 결정 필요: 서비스 프린시플 생성 시점(Phase 8 vs 재구축 단계)과 `run_as` 전환 계획
-- 제안: 최소 `run_as`용 SP 1개를 Phase 8에서 우선 도입하고, 재구축 단계에서 분리 권한 모델 완성
+- 상태: **결정됨(2026-02-06)**
+- 결정: 서비스 프린시플 기반 `run_as`/권한 전환은 보안 설정된 신규 리소스 준비 완료 후(Phase 11) 진행한다.
+- 영향: Phase 8~10 구간은 사용자 principal 임시 운영을 유지하고, Secure Environment Rebuild 단계에서 전환을 수행한다.
+- 근거: 사용자 결정 및 `.roadmap/implementation_roadmap.md` Phase 11 정책
 
 ### D-019 Analytics salt 해석 우선순위
 - 상태: **결정됨(2026-02-06, 개발단계)**
