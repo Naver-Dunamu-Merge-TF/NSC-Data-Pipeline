@@ -93,13 +93,54 @@ DQ/계약 위반/멱등성/게이팅 등 핵심 위험을 충분히 검증하기
 - 대상: 해당 테이블 단독
 - 행 수: **50행 + 불량 1행**
 
+### 16) timezone_boundary
+- 목적: UTC→KST 날짜 경계 변환 검증
+- 대상: `transaction_ledger`, `payment_orders`
+- 행 수: 3~5행 (UTC 15:00 경계 포함)
+
+### 17) hold_release_zero_flow
+- 목적: `HOLD/RELEASE`의 `amount_signed=0` 파생 검증
+- 대상: `transaction_ledger`
+- 행 수: 3~5행 (HOLD/RELEASE 포함)
+
+### 18) tx_id_multi_entry
+- 목적: 동일 `tx_id` 다중 엔트리 충돌/멱등성 위험 확인
+- 대상: `transaction_ledger`
+- 행 수: 3~6행 (동일 tx_id 2~3개)
+
+### 19) related_id_type_cast
+- 목적: `related_id`/`order_ref` 타입 캐스팅 검증
+- 대상: `orders`, `payment_orders`, `transaction_ledger`
+- 행 수: orders 1~2행, payment_orders 1~2행, ledger 2~3행
+
+### 20) status_null_and_invalid
+- 목적: `payment_orders.status` NULL/비허용값 처리 확인
+- 대상: `payment_orders`
+- 행 수: 3~5행 (NULL 1행, 비허용 1행)
+
+### 21) missing_event_time
+- 목적: `event_time`/`created_at` 누락 시 bad_records 분기
+- 대상: `transaction_ledger`
+- 행 수: 3~5행 (누락 1행)
+
+### 22) large_amount_precision
+- 목적: `DECIMAL(38,2)` 경계 금액 처리 확인
+- 대상: `transaction_ledger`, `payment_orders`
+- 행 수: 2~3행 (아주 큰 금액 1행 포함)
+
+### 23) gating_effect
+- 목적: `SOURCE_STALE`/`EVENT_DROP_SUSPECTED` 발생 시 게이팅 영향 확인
+- 대상: `dq_status`, `recon_daily_snapshot_flow`, `exception_ledger`
+- 행 수: 최소 행 수(테스트용)
+
 ## 우선순위(권장)
 1. dup_tx_id, missing_required, invalid_amount
-2. stale_source, zero_window
-3. drift_mismatch, supply_mismatch
-4. analytics_multi_item, analytics_missing_product
-5. backfill_two_days, bad_records_rate_exceed
+2. stale_source, zero_window, timezone_boundary
+3. drift_mismatch, supply_mismatch, hold_release_zero_flow
+4. analytics_multi_item, analytics_missing_product, related_id_type_cast
+5. backfill_two_days, bad_records_rate_exceed, gating_effect
 
 ## 참고
 - 임계치/룰은 `gold.dim_rule_scd2` 기준.
 - 시나리오 확장은 테스트/통합 환경 준비 단계(Phase 9) 전까지 완료를 권장.
+- `tx_id` 다중 엔트리 케이스는 D-008(멱등성 키 확장) 결정을 위한 근거로 활용.
