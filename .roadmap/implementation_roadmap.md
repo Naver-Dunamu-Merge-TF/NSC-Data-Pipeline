@@ -59,6 +59,8 @@
 - [ ] Commit
 
 ## Phase 7 — Cloud/Platform Setup (Azure + Databricks)
+- [ ] (운영 이관 전 재구축) 보안 하드닝: NSG/서브넷 분리/Private Endpoint/시크릿 경로 강화
+- [ ] (개발 단계 임시정책) 기능 검증 목적의 최소 구성 유지(퍼블릭 엔드포인트 허용)
 - [ ] Azure 스토리지 준비: ADLS Gen2 컨테이너/경로 설계 및 네이밍 규칙 정의
 - [ ] Key Vault/Secret Scope 설정: `salt`, DB 연결, 토큰 등 시크릿 관리
 - [ ] Databricks Workspace/Unity Catalog 준비: 메타스토어, 카탈로그/스키마 생성
