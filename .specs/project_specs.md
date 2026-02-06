@@ -533,6 +533,11 @@ mock_data/
 
 **단계적 접근**: 로컬 IDE 개발 → Databricks Connect 원격 테스트 → Databricks 웹플랫폼 운영
 
+Phase 7 이후 실행 원칙:
+- 현재 테스트 리소스에서 재사용 가능한 자산(코드/테스트/워크플로우 정의/문서)을 먼저 완료한다.
+- 보안 고정값이 필요한 항목(NSG/Private Endpoint/Key Vault/SP run_as)은 신규 보안 환경 재구축 단계로 분리한다.
+- 최종 운영 반영은 dry-run 리허설 후 컷오버로 진행한다.
+
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │  Phase 1        │    │  Phase 2        │    │  Phase 3        │
@@ -676,6 +681,26 @@ configs/
 - 일부 RDD 연산 미지원
 - Structured Streaming 제한적 지원
 - 클러스터 시작 대기 시간 (cold start)
+
+### 12.7 실행 페이즈 재배열 (테스트 리소스 우선 + 마이그레이션 분리)
+
+참조 문서:
+- `.roadmap/implementation_roadmap.md`
+- `.specs/cloud_migration_rebuild_plan.md`
+
+| 페이즈 | 목적 | 현재 테스트 리소스에서 수행 | 주요 산출물 |
+|---|---|---|---|
+| Phase 7 | Dev 최소 플랫폼 기준선 고정 | Yes | ADLS/UC/External Location, 임시 Secret Scope, 클러스터 정책, 설정/점검 스크립트 |
+| Phase 8 | Resource-agnostic 작업(Job wiring/config) | Yes | `run_id`/`pipeline_state`, `configs/*.yaml`, `databricks.yml` 또는 jobs 스크립트 변수화 |
+| Phase 9 | 테스트/CI 베이스라인 고도화 | Yes | integration smoke, E2E 스켈레톤, CI 유닛/커버리지 게이트 |
+| Phase 10 | 기능 안정화/운영 문서 고정 | Yes | 멱등성/백필 검증, 런북, 스키마/마이그레이션 정책, 컷오버 템플릿 |
+| Phase 11 | Secure 환경 재구축(신규 리소스) | No(신규 환경 필요) | NSG/서브넷/PE, Key Vault-backed Scope, SP run_as/ACL |
+| Phase 12 | 마이그레이션 리허설(dry-run) | No(신규 환경 필요) | `T_cutover_utc` 리허설, backfill/incremental 전환 검증, 롤백 리허설 |
+| Phase 13 | 운영 컷오버 + Hypercare | No(신규 환경 필요) | 최종 컷오버, post-cutover 검증, 구 리소스 정리, 운영 인수인계 |
+
+정책:
+- 환경 고유값(리소스 ID, 권한 주체, 네트워크 정책)은 코드/문서에서 파라미터화한다.
+- 테스트 리소스 단계에서 확정된 로직/테스트/런북 템플릿은 Secure 재구축 단계로 그대로 이관한다.
 
 ---
 

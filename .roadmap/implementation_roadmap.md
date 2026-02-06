@@ -3,6 +3,7 @@
 ## 기준 문서
 - `.specs/project_specs.md`
 - `.specs/data_contract.md`
+- `.specs/cloud_migration_rebuild_plan.md`
 - `.ref/database_schema`
 
 ## Phase 1 — 리포지토리 골격 + 공통 기반
@@ -58,37 +59,60 @@
 - [x] 단위 테스트: 익명화, 조인 기반 `category` 파생
 - [ ] Commit
 
-## Phase 7 — Cloud/Platform Setup (Azure + Databricks)
-- [ ] (운영 이관 전 재구축) 보안 하드닝: NSG/서브넷 분리/Private Endpoint/시크릿 경로 강화
+## Phase 7 — Dev Platform Baseline (테스트 리소스, 완료)
 - [x] (개발 단계 임시정책) 기능 검증 목적의 최소 구성 유지(퍼블릭 엔드포인트 허용)
 - [x] Azure 스토리지 준비: ADLS Gen2 컨테이너/경로 설계 및 네이밍 규칙 정의
-- [x] Key Vault/Secret Scope 설정: `salt`, DB 연결, 토큰 등 시크릿 관리(개발 임시: Databricks-backed Secret Scope)
 - [x] Databricks Workspace/Unity Catalog 준비: 메타스토어, 카탈로그/스키마 생성
 - [x] Storage Credential + External Location 설정(UC 기반)
-- [ ] 서비스 프린시플/권한 부여: 카탈로그, 스키마, 테이블 ACL(임시로 사용자 ACL 적용, 서비스 프린시플은 유예)
+- [x] 개발 임시 Secret Scope 구성(`ledger-analytics-dev/salt_user_key`)
 - [x] 클러스터 정책/기본 클러스터 템플릿 정의(DBR 버전, 자동 종료, 태그)
-- [x] Workflows 알림 채널 연동(Slack/Email) 및 재시도 정책 정의(Email+Retry 우선 적용)
+- [x] Workflows 재시도/알림 정책 1차 적용(Email+Retry)
 - [x] Phase 7 설정/점검 스크립트 추가(`scripts/phase7/setup_minimal_cloud.sh`, `scripts/phase7/audit_cloud_state.sh`)
-- [ ] Commit
+- [x] Commit
 
-## Phase 8 — Job Wiring + 환경 설정
+## Phase 8 — Resource-agnostic Job Wiring + Config (현재 리소스에서 우선)
 - [ ] 공통 파라미터 처리, `run_id` 전파, `gold.pipeline_state` 업데이트 구현
 - [ ] `gold.pipeline_state` 갱신 규칙 정의(성공/실패, last_processed_end, last_run_id)
 - [ ] `configs/dev.yaml`, `configs/prod.yaml`, `configs/common.yaml` 구조 확정
-- [ ] Databricks Workflows/Jobs 정의(`databricks.yml` 또는 jobs 스크립트)
+- [ ] Databricks Workflows/Jobs 정의 코드화(`databricks.yml` 또는 jobs 스크립트)
+- [ ] 환경 고유값(workspace/job/policy ID, storage path) 변수화
 - [ ] Commit
 
-## Phase 9 — 테스트/CI 정리
+## Phase 9 — 테스트/CI 베이스라인 정리 (이식 가능 자산 우선)
 - [ ] `tests/integration` PySpark 테스트 구성 및 스모크 시나리오 작성
-- [ ] E2E 테스트 스켈레톤 및 실행 가이드 추가
-- [ ] CI 스크립트 초안(유닛 테스트 게이트)
+- [ ] E2E 테스트 스켈레톤 및 실행 가이드 추가(워크스페이스 파라미터화)
+- [ ] CI 스크립트 초안(유닛 테스트 게이트 + 커버리지 기준)
+- [ ] 검증 로그/증적 템플릿(`.agents/logs/verification/`) 정리
 - [ ] Commit
 
-## Phase 10 — 안정화 및 문서화
+## Phase 10 — 기능 안정화 + 운영 문서화 (이관 전 고정)
 - [ ] 멱등성/백필 시나리오 검증 보강
 - [ ] 운영/장애 대응 런북, 알림 정책 문서화
 - [ ] 스키마 변경/마이그레이션 정책 문서화(Silver/Gold 명시적 변경)
 - [ ] 성능/파티셔닝 점검(필요 시 최적화 반영)
+- [ ] 컷오버 Preflight/Exit Criteria 템플릿 고정(참조: `.specs/cloud_migration_rebuild_plan.md`)
+- [ ] Commit
+
+## Phase 11 — Secure Environment Rebuild (신규 리소스 생성)
+- [ ] 보안 하드닝: NSG/서브넷 분리/Private Endpoint/네트워크 경로 강화
+- [ ] Key Vault + Key Vault-backed Secret Scope 구성
+- [ ] 서비스 프린시플 기반 `run_as`/권한 모델 전환(UC ACL 포함)
+- [ ] Secure Workspace/UC 오브젝트 프로비저닝 자동화 스크립트 확정
+- [ ] 신규 환경 E2E 스모크(L3) 통과
+- [ ] Commit
+
+## Phase 12 — Migration Rehearsal (Dry-run)
+- [ ] `T_cutover_utc` 기준 dry-run 리허설 실행
+- [ ] Pipeline A/B/C backfill + incremental 전환 리허설
+- [ ] 롤백 리허설(Workflow 전환 + Bronze 기준 재백필) 수행
+- [ ] 검증 쿼리/증적 로그 수집 및 결과 기록
+- [ ] Commit
+
+## Phase 13 — Production Cutover + Hypercare
+- [ ] 컷오버 실행 및 신규 환경 Workflows 활성화
+- [ ] Post-cutover 검증(정합성/누락/중복/알림) 수행
+- [ ] 구 dev/테스트 리소스 정리(보존 정책 반영)
+- [ ] 운영 인수인계 문서/체크리스트 최종 확정
 - [ ] Commit
 
 ## Phase별 산출물 체크리스트
@@ -138,25 +162,48 @@
 
 ### Phase 7
 - [x] ADLS Gen2 경로/컨테이너 구조 확정
-- [x] Key Vault/Secret Scope 시크릿 등록 확인(개발 임시: Databricks-backed Scope)
+- [x] Dev 임시 Secret Scope 시크릿 등록 확인
 - [x] Unity Catalog 메타스토어/카탈로그/스키마 생성 확인
 - [x] Storage Credential/External Location 설정 확인
-- [ ] 서비스 프린시플 권한 부여 확인(유예)
 - [x] 클러스터 정책/템플릿 정의 완료
-- [x] Workflows 알림/재시도 정책 설정 완료(Email+Retry)
+- [x] Workflows 알림/재시도 정책 1차 설정 완료(Email+Retry)
+- [x] 설정/점검 스크립트 기반 재현성 확인
+- [x] Commit 완료
 
 ### Phase 8
 - [ ] `gold.pipeline_state` 갱신 규칙 구현 확인
 - [ ] 환경 설정 파일 구조 확정
-- [ ] Workflows/Jobs 정의 완료
+- [ ] Workflows/Jobs 정의 코드화 완료
+- [ ] 환경 고유값 변수화 완료
 
 ### Phase 9
 - [ ] 통합/스모크 테스트 스위트 준비
-- [ ] E2E 스켈레톤 및 실행 가이드 작성
-- [ ] CI 유닛 테스트 게이트 초안 작성
+- [ ] E2E 스켈레톤 및 실행 가이드(워크스페이스 파라미터화) 작성
+- [ ] CI 유닛 테스트 게이트/커버리지 기준 초안 작성
+- [ ] 검증 로그 템플릿 정리
 
 ### Phase 10
 - [ ] 멱등성/백필 시나리오 검증 완료
 - [ ] 운영 런북/알림 정책 문서화 완료
 - [ ] 스키마 변경/마이그레이션 정책 문서화 완료
 - [ ] 성능/파티셔닝 점검 및 튜닝 항목 기록
+- [ ] 컷오버 Preflight/Exit Criteria 템플릿 고정
+
+### Phase 11
+- [ ] 보안 하드닝 인프라 생성 완료(NSG/서브넷/Private Endpoint)
+- [ ] Key Vault-backed Secret Scope 구성 완료
+- [ ] 서비스 프린시플 기반 실행 주체/권한 모델 전환 완료
+- [ ] Secure Workspace/UC 자동화 스크립트 검증 완료
+- [ ] 신규 환경 E2E 스모크(L3) 통과
+
+### Phase 12
+- [ ] Dry-run 컷오버 리허설 완료
+- [ ] Backfill + incremental 전환 리허설 완료
+- [ ] 롤백 리허설 완료
+- [ ] 검증 증적/로그 기록 완료
+
+### Phase 13
+- [ ] 운영 컷오버 완료
+- [ ] Post-cutover 검증 완료
+- [ ] 구 dev/테스트 리소스 정리 완료
+- [ ] 운영 인수인계 문서/체크리스트 확정
