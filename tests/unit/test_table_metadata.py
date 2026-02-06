@@ -40,8 +40,10 @@ def test_gold_merge_keys_and_partitions() -> None:
         "date_kst",
         "user_id",
     )
+    assert GOLD_MERGE_KEYS["gold.pipeline_state"] == ("pipeline_name",)
     assert GOLD_MERGE_KEYS["gold.fact_payment_anonymized"] == ()
     assert GOLD_PARTITION_COLUMNS["gold.fact_payment_anonymized"] == ("date_kst",)
+    assert GOLD_PARTITION_COLUMNS["gold.pipeline_state"] == ()
     assert GOLD_PARTITION_COLUMNS["gold.admin_tx_search"] == ("event_date_kst",)
 
 

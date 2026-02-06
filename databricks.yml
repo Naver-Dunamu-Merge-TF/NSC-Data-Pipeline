@@ -1,0 +1,183 @@
+bundle:
+  name: data-pipeline
+
+variables:
+  workspace_host:
+    description: Databricks workspace host
+  catalog:
+    description: Unity Catalog name
+  cluster_policy_id:
+    description: Cluster policy id
+
+targets:
+  dev:
+    default: true
+    workspace:
+      host: ${var.workspace_host}
+    variables:
+      workspace_host: https://adb-1234567890123456.7.azuredatabricks.net
+      catalog: 2dt_final_team4_databricks_test
+      cluster_policy_id: "00023C6641CF09E4"
+
+  prod:
+    workspace:
+      host: ${var.workspace_host}
+    variables:
+      workspace_host: https://<prod-workspace-host>
+      catalog: prod_catalog
+      cluster_policy_id: "<prod-cluster-policy-id>"
+
+resources:
+  jobs:
+    pipeline_a_guardrail:
+      name: data-pipeline-a-${bundle.target}
+      max_concurrent_runs: 1
+      timeout_seconds: 3600
+      schedule:
+        quartz_cron_expression: "0 0/10 * * * ?"
+        timezone_id: Asia/Seoul
+      email_notifications:
+        on_failure:
+          - 2dt026@msacademy.msai.kr
+      parameters:
+        - name: run_mode
+          default: incremental
+        - name: start_ts
+          default: ""
+        - name: end_ts
+          default: ""
+        - name: date_kst_start
+          default: ""
+        - name: date_kst_end
+          default: ""
+        - name: run_id
+          default: ""
+      job_clusters:
+        - job_cluster_key: policy_single_node
+          new_cluster:
+            spark_version: "13.3.x-scala2.12"
+            num_workers: 0
+            node_type_id: Standard_DS3_v2
+            policy_id: ${var.cluster_policy_id}
+      tasks:
+        - task_key: run_pipeline_a
+          job_cluster_key: policy_single_node
+          spark_python_task:
+            python_file: scripts/run_pipeline_a.py
+            parameters:
+              - "--catalog"
+              - "${var.catalog}"
+              - "--run-mode"
+              - "{{job.parameters.run_mode}}"
+              - "--start-ts"
+              - "{{job.parameters.start_ts}}"
+              - "--end-ts"
+              - "{{job.parameters.end_ts}}"
+              - "--date-kst-start"
+              - "{{job.parameters.date_kst_start}}"
+              - "--date-kst-end"
+              - "{{job.parameters.date_kst_end}}"
+              - "--run-id"
+              - "{{job.parameters.run_id}}"
+
+    pipeline_b_controls:
+      name: data-pipeline-b-${bundle.target}
+      max_concurrent_runs: 1
+      timeout_seconds: 3600
+      schedule:
+        quartz_cron_expression: "0 5 0 * * ?"
+        timezone_id: Asia/Seoul
+      email_notifications:
+        on_failure:
+          - 2dt026@msacademy.msai.kr
+      parameters:
+        - name: run_mode
+          default: incremental
+        - name: start_ts
+          default: ""
+        - name: end_ts
+          default: ""
+        - name: date_kst_start
+          default: ""
+        - name: date_kst_end
+          default: ""
+        - name: run_id
+          default: ""
+      job_clusters:
+        - job_cluster_key: policy_single_node
+          new_cluster:
+            spark_version: "13.3.x-scala2.12"
+            num_workers: 0
+            node_type_id: Standard_DS3_v2
+            policy_id: ${var.cluster_policy_id}
+      tasks:
+        - task_key: run_pipeline_b
+          job_cluster_key: policy_single_node
+          spark_python_task:
+            python_file: scripts/run_pipeline_b.py
+            parameters:
+              - "--catalog"
+              - "${var.catalog}"
+              - "--run-mode"
+              - "{{job.parameters.run_mode}}"
+              - "--start-ts"
+              - "{{job.parameters.start_ts}}"
+              - "--end-ts"
+              - "{{job.parameters.end_ts}}"
+              - "--date-kst-start"
+              - "{{job.parameters.date_kst_start}}"
+              - "--date-kst-end"
+              - "{{job.parameters.date_kst_end}}"
+              - "--run-id"
+              - "{{job.parameters.run_id}}"
+
+    pipeline_c_analytics:
+      name: data-pipeline-c-${bundle.target}
+      max_concurrent_runs: 1
+      timeout_seconds: 3600
+      schedule:
+        quartz_cron_expression: "0 20 0 * * ?"
+        timezone_id: Asia/Seoul
+      email_notifications:
+        on_failure:
+          - 2dt026@msacademy.msai.kr
+      parameters:
+        - name: run_mode
+          default: incremental
+        - name: start_ts
+          default: ""
+        - name: end_ts
+          default: ""
+        - name: date_kst_start
+          default: ""
+        - name: date_kst_end
+          default: ""
+        - name: run_id
+          default: ""
+      job_clusters:
+        - job_cluster_key: policy_single_node
+          new_cluster:
+            spark_version: "13.3.x-scala2.12"
+            num_workers: 0
+            node_type_id: Standard_DS3_v2
+            policy_id: ${var.cluster_policy_id}
+      tasks:
+        - task_key: run_pipeline_c
+          job_cluster_key: policy_single_node
+          spark_python_task:
+            python_file: scripts/run_pipeline_c.py
+            parameters:
+              - "--catalog"
+              - "${var.catalog}"
+              - "--run-mode"
+              - "{{job.parameters.run_mode}}"
+              - "--start-ts"
+              - "{{job.parameters.start_ts}}"
+              - "--end-ts"
+              - "{{job.parameters.end_ts}}"
+              - "--date-kst-start"
+              - "{{job.parameters.date_kst_start}}"
+              - "--date-kst-end"
+              - "{{job.parameters.date_kst_end}}"
+              - "--run-id"
+              - "{{job.parameters.run_id}}"

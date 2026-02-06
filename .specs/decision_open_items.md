@@ -129,3 +129,9 @@
 - 결정: `ANON_USER_KEY_SALT` 환경변수 우선, 없으면 Secret Scope(`ledger-analytics-dev/salt_user_key`), 둘 다 없으면 로컬 더미 `local-salt-v1` 사용
 - 영향: 로컬/Databricks 실행 모두에서 익명화 키 생성 동작을 일관화
 - 근거: D-014, D-015 및 Phase 6 구현 정책
+
+### D-020 `gold.pipeline_state` 실패 시 업데이트 규칙
+- 상태: **결정됨(2026-02-06, 개발단계)**
+- 결정: 성공 시 `last_success_ts`, `last_processed_end`, `last_run_id`를 모두 갱신하고, 실패 시 `last_success_ts`/`last_processed_end`는 유지하며 `last_run_id`, `updated_at`만 갱신
+- 영향: 증분 재개 체크포인트는 마지막 성공 지점을 보존하고, 최근 실패 실행 ID는 추적 가능
+- 근거: `.specs/project_specs.md` 9.1, Phase 8 구현 정책

@@ -28,3 +28,10 @@ def test_cast_map_contains_types() -> None:
     cast_map = contract.cast_map
     assert cast_map["amount_signed"] == "decimal(38,2)"
     assert cast_map["event_time"] == "timestamp"
+
+
+def test_pipeline_state_contract_exists() -> None:
+    contract = get_contract("gold.pipeline_state")
+    cast_map = contract.cast_map
+    assert cast_map["pipeline_name"] == "string"
+    assert cast_map["last_processed_end"] == "timestamp"

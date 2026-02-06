@@ -71,12 +71,12 @@
 - [x] Commit
 
 ## Phase 8 — Resource-agnostic Job Wiring + Config (현재 리소스에서 우선)
-- [ ] 공통 파라미터 처리, `run_id` 전파, `gold.pipeline_state` 업데이트 구현
-- [ ] `gold.pipeline_state` 갱신 규칙 정의(성공/실패, last_processed_end, last_run_id)
-- [ ] `configs/dev.yaml`, `configs/prod.yaml`, `configs/common.yaml` 구조 확정
-- [ ] Databricks Workflows/Jobs 정의 코드화(`databricks.yml` 또는 jobs 스크립트)
-- [ ] 환경 고유값(workspace/job/policy ID, storage path) 변수화
-- [ ] Commit
+- [x] 공통 파라미터 처리, `run_id` 전파, `gold.pipeline_state` 업데이트 구현
+- [x] `gold.pipeline_state` 갱신 규칙 정의(성공/실패, last_processed_end, last_run_id)
+- [x] `configs/dev.yaml`, `configs/prod.yaml`, `configs/common.yaml` 구조 확정
+- [x] Databricks Workflows/Jobs 정의 코드화(`databricks.yml` 또는 jobs 스크립트)
+- [x] 환경 고유값(workspace/job/policy ID, storage path) 변수화
+- [x] Commit
 
 ## Phase 9 — 테스트/CI 베이스라인 정리 (이식 가능 자산 우선)
 - [ ] `tests/integration` PySpark 테스트 구성 및 스모크 시나리오 작성
@@ -171,10 +171,10 @@
 - [x] Commit 완료
 
 ### Phase 8
-- [ ] `gold.pipeline_state` 갱신 규칙 구현 확인
-- [ ] 환경 설정 파일 구조 확정
-- [ ] Workflows/Jobs 정의 코드화 완료
-- [ ] 환경 고유값 변수화 완료
+- [x] `gold.pipeline_state` 갱신 규칙 구현 확인
+- [x] 환경 설정 파일 구조 확정
+- [x] Workflows/Jobs 정의 코드화 완료
+- [x] 환경 고유값 변수화 완료
 
 ### Phase 9
 - [ ] 통합/스모크 테스트 스위트 준비
