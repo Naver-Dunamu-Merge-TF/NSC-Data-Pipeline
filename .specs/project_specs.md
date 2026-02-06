@@ -419,23 +419,48 @@ Silver/Gold는 MERGE 키를 명확히 정의한다.
 
 ```
 mock_data/
-├── bronze/
-│   ├── user_wallets_raw/
-│   ├── transaction_ledger_raw/
-│   └── payment_orders_raw/
 ├── scenarios/
-│   ├── happy_path/          # 정상 케이스
-│   ├── edge_cases/          # 경계값 케이스
-│   └── error_cases/         # 오류 케이스
+│   ├── one_day_normal/
+│   ├── dup_tx_id/
+│   ├── missing_required/
+│   ├── invalid_amount/
+│   ├── unknown_entry_type/
+│   ├── status_not_allowed/
+│   ├── stale_source/
+│   ├── zero_window/
+│   ├── drift_mismatch/
+│   ├── supply_mismatch/
+│   ├── pairing_quality/
+│   ├── analytics_multi_item/
+│   ├── analytics_missing_product/
+│   ├── backfill_two_days/
+│   ├── bad_records_rate_exceed/
+│   ├── timezone_boundary/
+│   ├── hold_release_zero_flow/
+│   ├── tx_id_multi_entry/
+│   ├── related_id_type_cast/
+│   ├── status_null_and_invalid/
+│   ├── missing_event_time/
+│   ├── large_amount_precision/
+│   └── gating_effect/
+├── bronze/
+│   ├── user_wallets_raw/<scenario>/data.jsonl
+│   ├── transaction_ledger_raw/<scenario>/data.jsonl
+│   ├── payment_orders_raw/<scenario>/data.jsonl
+│   ├── orders_raw/<scenario>/data.jsonl
+│   ├── order_items_raw/<scenario>/data.jsonl
+│   └── products_raw/<scenario>/data.jsonl
 └── fixtures/
     └── dim_rule_scd2.json   # 룰 테이블 시딩
 ```
 
 #### 10.3.2 생성 원칙
 
-- 최소 데이터: 테스트 목적에 필요한 최소 레코드만
+- 의미 있는 최소 데이터: 규칙/임계치 검증이 가능한 수준의 레코드 수 확보
 - 결정적 데이터: 랜덤 값 대신 고정 시드 또는 하드코딩
 - 시나리오별 분리: 독립 실행 가능한 데이터셋
+- 시나리오와 Bronze 미러를 1:1로 유지
+- 상세 시나리오 정의 및 권장 행 수의 SSOT: `.specs/mock_data_scenarios_plan.md`
 
 #### 10.3.3 주요 시나리오
 
@@ -443,9 +468,17 @@ mock_data/
 |----------|------|-------------|
 | `one_day_normal` | 1일치 정상 거래 | drift = 0, 예외 없음 |
 | `stale_source` | 오래된 ingested_at | SOURCE_STALE 예외 |
-| `duplicate_tx` | 중복 tx_id | DUP_SUSPECTED 예외 |
-| `bad_amount` | amount = NULL | bad_records 격리 |
-| `multi_day_backfill` | 3일치 백필 | 파티션별 멱등성 |
+| `dup_tx_id` | 중복 tx_id | DUP_SUSPECTED 예외 |
+| `invalid_amount` | amount <= 0 / 음수 잔액 | bad_records 격리 |
+| `backfill_two_days` | 2일치 백필 | 파티션별 멱등성 |
+| `bad_records_rate_exceed` | bad_records_rate > 임계치 | fail-fast 동작 |
+
+추가 시나리오 카탈로그:
+`missing_required`, `unknown_entry_type`, `status_not_allowed`, `zero_window`,
+`drift_mismatch`, `supply_mismatch`, `pairing_quality`, `analytics_multi_item`,
+`analytics_missing_product`, `timezone_boundary`, `hold_release_zero_flow`,
+`tx_id_multi_entry`, `related_id_type_cast`, `status_null_and_invalid`,
+`missing_event_time`, `large_amount_precision`, `gating_effect`
 
 ### 10.4 품질 게이트
 
