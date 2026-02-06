@@ -86,12 +86,12 @@
 - [x] Commit
 
 ## Phase 10 — 기능 안정화 + 운영 문서화 (이관 전 고정)
-- [ ] 멱등성/백필 시나리오 검증 보강
-- [ ] 운영/장애 대응 런북, 알림 정책 문서화
-- [ ] 스키마 변경/마이그레이션 정책 문서화(Silver/Gold 명시적 변경)
-- [ ] 성능/파티셔닝 점검(필요 시 최적화 반영)
-- [ ] 컷오버 Preflight/Exit Criteria 템플릿 고정(참조: `.specs/cloud_migration_rebuild_plan.md`)
-- [ ] Commit
+- [x] 멱등성/백필 시나리오 검증 보강
+- [x] 운영/장애 대응 런북, 알림 정책 문서화
+- [x] 스키마 변경/마이그레이션 정책 문서화(Silver/Gold 명시적 변경)
+- [x] 성능/파티셔닝 점검(필요 시 최적화 반영)
+- [x] 컷오버 Preflight/Exit Criteria 템플릿 고정(참조: `.specs/cloud_migration_rebuild_plan.md`)
+- [x] Commit
 
 ## Phase 11 — Secure Environment Rebuild (신규 리소스 생성)
 - [ ] 보안 하드닝: NSG/서브넷 분리/Private Endpoint/네트워크 경로 강화
@@ -183,11 +183,11 @@
 - [x] 검증 로그 템플릿 정리
 
 ### Phase 10
-- [ ] 멱등성/백필 시나리오 검증 완료
-- [ ] 운영 런북/알림 정책 문서화 완료
-- [ ] 스키마 변경/마이그레이션 정책 문서화 완료
-- [ ] 성능/파티셔닝 점검 및 튜닝 항목 기록
-- [ ] 컷오버 Preflight/Exit Criteria 템플릿 고정
+- [x] 멱등성/백필 시나리오 검증 완료
+- [x] 운영 런북/알림 정책 문서화 완료
+- [x] 스키마 변경/마이그레이션 정책 문서화 완료
+- [x] 성능/파티셔닝 점검 및 튜닝 항목 기록
+- [x] 컷오버 Preflight/Exit Criteria 템플릿 고정
 
 ### Phase 11
 - [ ] 보안 하드닝 인프라 생성 완료(NSG/서브넷/Private Endpoint)
