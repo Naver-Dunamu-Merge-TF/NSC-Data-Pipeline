@@ -15,3 +15,33 @@ SILVER_PARTITION_COLUMNS: dict[str, tuple[str, ...]] = {
     "silver.order_items": (),
     "silver.products": (),
 }
+
+GOLD_MERGE_KEYS: dict[str, tuple[str, ...]] = {
+    "gold.recon_daily_snapshot_flow": ("date_kst", "user_id"),
+    "gold.ledger_supply_balance_daily": ("date_kst",),
+    "gold.exception_ledger": ("date_kst", "domain", "exception_type", "run_id"),
+    "gold.ops_payment_failure_daily": ("date_kst", "merchant_name"),
+    "gold.ops_ledger_pairing_quality_daily": ("date_kst",),
+    "gold.admin_tx_search": ("event_date_kst", "tx_id"),
+    "gold.fact_payment_anonymized": (),
+}
+
+GOLD_PARTITION_COLUMNS: dict[str, tuple[str, ...]] = {
+    "gold.recon_daily_snapshot_flow": ("date_kst",),
+    "gold.ledger_supply_balance_daily": ("date_kst",),
+    "gold.exception_ledger": ("date_kst",),
+    "gold.ops_payment_failure_daily": ("date_kst",),
+    "gold.ops_ledger_pairing_quality_daily": ("date_kst",),
+    "gold.admin_tx_search": ("event_date_kst",),
+    "gold.fact_payment_anonymized": ("date_kst",),
+}
+
+GOLD_WRITE_STRATEGY: dict[str, str] = {
+    "gold.recon_daily_snapshot_flow": "merge",
+    "gold.ledger_supply_balance_daily": "merge",
+    "gold.exception_ledger": "merge",
+    "gold.ops_payment_failure_daily": "merge",
+    "gold.ops_ledger_pairing_quality_daily": "merge",
+    "gold.admin_tx_search": "merge",
+    "gold.fact_payment_anonymized": "overwrite_partitions",
+}

@@ -1,0 +1,60 @@
+from __future__ import annotations
+
+import builtins
+import os
+from collections.abc import Mapping
+
+DEFAULT_SECRET_SCOPE = "ledger-analytics-dev"
+DEFAULT_SECRET_KEY = "salt_user_key"
+LOCAL_DUMMY_SALT = "local-salt-v1"
+ENV_ANON_SALT = "ANON_USER_KEY_SALT"
+
+
+def _try_get_dbutils():
+    candidate = getattr(builtins, "dbutils", None)
+    if candidate is not None:
+        return candidate
+
+    try:
+        from pyspark.dbutils import DBUtils
+        from pyspark.sql import SparkSession
+    except Exception:
+        return None
+
+    spark = SparkSession.getActiveSession()
+    if spark is None:
+        return None
+    try:
+        return DBUtils(spark)
+    except Exception:
+        return None
+
+
+def resolve_user_key_salt(
+    *,
+    secret_scope: str = DEFAULT_SECRET_SCOPE,
+    secret_key: str = DEFAULT_SECRET_KEY,
+    env: Mapping[str, str] | None = None,
+    dbutils=None,
+    allow_local_fallback: bool = True,
+) -> str:
+    env_map = env if env is not None else os.environ
+    env_salt = env_map.get(ENV_ANON_SALT)
+    if env_salt:
+        return env_salt
+
+    client = dbutils if dbutils is not None else _try_get_dbutils()
+    if client is not None:
+        try:
+            secret_value = client.secrets.get(scope=secret_scope, key=secret_key)
+        except Exception:
+            secret_value = None
+        if secret_value:
+            return secret_value
+
+    if allow_local_fallback:
+        return LOCAL_DUMMY_SALT
+
+    raise RuntimeError(
+        "Unable to resolve anonymization salt from env or Databricks secret scope"
+    )

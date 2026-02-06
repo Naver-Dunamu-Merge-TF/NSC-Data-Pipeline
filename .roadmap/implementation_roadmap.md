@@ -54,10 +54,10 @@
 
 ## Phase 6 — Silver(Analytics) + Pipeline C
 - [x] `silver.order_events`, `silver.order_items`, `silver.products` 변환 구현
-- [ ] PII 제거 및 `user_key` 익명화 처리(Secret Scope 기반, 로컬은 더미 값)
-- [ ] `gold.fact_payment_anonymized` 산출 및 파티셔닝 적용
+- [x] PII 제거 및 `user_key` 익명화 처리(Secret Scope 기반, 로컬은 더미 값)
+- [x] `gold.fact_payment_anonymized` 산출 및 파티셔닝 적용
 - [x] 단위 테스트: 익명화, 조인 기반 `category` 파생
-- [ ] Commit
+- [x] Commit
 
 ## Phase 7 — Dev Platform Baseline (테스트 리소스, 완료)
 - [x] (개발 단계 임시정책) 기능 검증 목적의 최소 구성 유지(퍼블릭 엔드포인트 허용)
@@ -156,8 +156,8 @@
 
 ### Phase 6
 - [x] `silver.order_events/order_items/products` 산출 검증
-- [ ] `user_key` 익명화 동작 확인(Secret Scope/로컬 더미)
-- [ ] `gold.fact_payment_anonymized` 파티셔닝 적용 확인
+- [x] `user_key` 익명화 동작 확인(Secret Scope/로컬 더미)
+- [x] `gold.fact_payment_anonymized` 파티셔닝 적용 확인
 - [x] 단위 테스트 통과
 
 ### Phase 7

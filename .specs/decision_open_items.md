@@ -106,10 +106,11 @@
 - 근거: 재현 가능한 테스트 실행을 위한 고정 상수 정책
 
 ### D-016 `gold.fact_payment_anonymized` 멱등성/파티셔닝 전략
-- 현재 상태: `date_kst` 파티션 적용은 가능하나, `MERGE` 키/overwrite 규칙 미정
-- 영향: 백필/재실행 시 결과 수렴 방식
-- 결정 필요: `overwrite partition(date_kst)` vs `MERGE` 키(예: `date_kst`,`user_key`,`merchant_name`) 확정
-- 제안: 배치 단위가 명확하면 `overwrite partition(date_kst)` 우선
+- 상태: **결정됨(2026-02-06, 개발단계 임시)**
+- 결정: `date_kst` 단위 `overwrite partition` 전략을 사용하고, Pipeline C에서는 대상 파티션만 교체한다.
+- 영향: 백필/재실행 시 동일 `date_kst` 범위에 대해 결과 수렴을 보장한다.
+- 후속: 운영 데이터량/지연 요구가 커지면 `MERGE` 키 전략으로 재평가한다.
+- 근거: `.specs/cloud_migration_rebuild_plan.md`, `.roadmap/implementation_roadmap.md` Phase 6
 
 ### D-017 개발 단계 보안 하드닝 유예 범위
 - 상태: **결정됨(2026-02-06)**
@@ -122,3 +123,9 @@
 - 영향: 운영 이관 시 잡 실행 주체/권한 일관성
 - 결정 필요: 서비스 프린시플 생성 시점(Phase 8 vs 재구축 단계)과 `run_as` 전환 계획
 - 제안: 최소 `run_as`용 SP 1개를 Phase 8에서 우선 도입하고, 재구축 단계에서 분리 권한 모델 완성
+
+### D-019 Analytics salt 해석 우선순위
+- 상태: **결정됨(2026-02-06, 개발단계)**
+- 결정: `ANON_USER_KEY_SALT` 환경변수 우선, 없으면 Secret Scope(`ledger-analytics-dev/salt_user_key`), 둘 다 없으면 로컬 더미 `local-salt-v1` 사용
+- 영향: 로컬/Databricks 실행 모두에서 익명화 키 생성 동작을 일관화
+- 근거: D-014, D-015 및 Phase 6 구현 정책
