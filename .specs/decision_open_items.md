@@ -93,16 +93,17 @@
 - 제안: 필요 시 `snapshot_date_kst` 등 보강 후 파티셔닝 검토
 
 ### D-014 Analytics `salt` Secret Scope/Key 정의
-- 현재 상태: Secret Scope 이름과 `salt` 키가 미정
+- 상태: **결정됨(2026-02-06, dev 임시 기준)**
+- 결정: `scope=ledger-analytics-dev`, `key=salt_user_key`
+- 후속: 운영 재구축 시 Key Vault-backed Secret Scope로 전환
 - 영향: `user_key` 익명화 구현 및 배포 환경 설정
-- 결정 필요: Secret Scope 이름, `salt` 키명, 운영/개발 분리 여부
-- 제안: `scope=ledger-analytics`, `key=salt_user_key` 같은 고정 규칙으로 통일
+- 근거: `.specs/phase7_cloud_setup_status.md`, `scripts/phase7/setup_minimal_cloud.sh`
 
 ### D-015 로컬 더미 `salt` 값
-- 현재 상태: 로컬 실행 시 사용할 더미 `salt` 값 미정
+- 상태: **결정됨(2026-02-06)**
+- 결정: 로컬 더미 `salt` 상수는 `local-salt-v1`
 - 영향: 로컬 테스트 재현성
-- 결정 필요: 고정 더미 문자열(예: `local-salt`) 여부
-- 제안: 테스트 고정성을 위해 문서화된 상수값 사용
+- 근거: 재현 가능한 테스트 실행을 위한 고정 상수 정책
 
 ### D-016 `gold.fact_payment_anonymized` 멱등성/파티셔닝 전략
 - 현재 상태: `date_kst` 파티션 적용은 가능하나, `MERGE` 키/overwrite 규칙 미정
@@ -111,7 +112,13 @@
 - 제안: 배치 단위가 명확하면 `overwrite partition(date_kst)` 우선
 
 ### D-017 개발 단계 보안 하드닝 유예 범위
-- 현재 가정: 개발/테스트 단계에서는 퍼블릭 엔드포인트 기반 최소 구성으로 진행하고, NSG/서브넷 분리/Private Endpoint/강화된 시크릿 경로는 **개발 완료 후 재구축 단계**에서 적용
+- 상태: **결정됨(2026-02-06)**
+- 결정: 개발/테스트 단계에서는 퍼블릭 엔드포인트 기반 최소 구성으로 진행하고, NSG/서브넷 분리/Private Endpoint/강화된 시크릿 경로는 **개발 완료 후 재구축 단계**에서 적용
 - 영향: Phase 7의 보안 관련 산출물은 “최종 보안 구성”이 아닌 임시 구성이 될 수 있음
-- 결정 필요: 재구축 시점(예: Phase 10 완료 직후)과 보안 재구축 체크리스트 확정
-- 제안: 기능 검증 완료 후 별도 하드닝 스프린트로 일괄 적용
+- 근거: 사용자 결정 및 `.specs/cloud_migration_rebuild_plan.md`
+
+### D-018 서비스 프린시플 실행 주체 전환 시점
+- 현재 상태: Phase 7에서는 사용자 principal(`2dt026@msacademy.msai.kr`) ACL로 임시 운영 중
+- 영향: 운영 이관 시 잡 실행 주체/권한 일관성
+- 결정 필요: 서비스 프린시플 생성 시점(Phase 8 vs 재구축 단계)과 `run_as` 전환 계획
+- 제안: 최소 `run_as`용 SP 1개를 Phase 8에서 우선 도입하고, 재구축 단계에서 분리 권한 모델 완성

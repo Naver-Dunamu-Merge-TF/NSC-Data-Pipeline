@@ -28,17 +28,14 @@ Last updated: 2026-02-06
 현재 확인된 갭(Phase 7 미완료):
 
 - Key Vault 미구성
-- Unity Catalog 메타스토어/카탈로그/스키마 운영 기준 미정
-- `2dtfinalteam4storagetest` 대상 Storage Credential/External Location 미구성
-- 서비스 프린시플/권한 모델 미확정
-- Workflows 알림 채널/재시도 정책 미정
+- 서비스 프린시플 기반 실행 주체/권한 모델 미확정
+- Slack 알림 채널 미연동(현재 Email only)
+- Pipeline B/C Workflow 정책 미배포(현재 Pipeline A 우선 반영)
 
 컷오버 전 확정이 필요한 의사결정:
 
-- D-014: Analytics `salt` Secret Scope/Key
-- D-015: 로컬 더미 `salt` 값
 - D-016: `gold.fact_payment_anonymized` 멱등성/파티셔닝 방식
-- D-017: 보안 하드닝 유예 범위와 재구축 시점
+- D-018: 서비스 프린시플 실행 주체 전환 시점
 
 ## 3. 범위
 
@@ -250,13 +247,13 @@ Phase 7~8 항목 기준:
 
 - [ ] 환경별 네이밍 규칙(`dev`, `prod-secure`) 확정
 - [ ] `T_cutover_utc` 운영 규칙 확정
-- [ ] UC 오브젝트 생성/권한 부여 절차 스크립트화
+- [x] UC 오브젝트 생성/권한 부여 절차 스크립트화(`scripts/phase7/setup_minimal_cloud.sh`)
 - [ ] Secret Scope/Key Vault 연동 절차 확정
 - [ ] 백필/증분 전환 런북 작성
 - [ ] 멱등성 검증 시나리오(재실행/백필) 확정
 - [ ] 파괴 안전장치 체크리스트 확정
 - [ ] 컷오버 단계별 Exit Criteria 템플릿 문서화
-- [ ] 검증 쿼리/로그 경로(`.agents/logs/verification/`) 운영 템플릿 확정
+- [x] 검증 쿼리/로그 경로(`.agents/logs/verification/`) 운영 템플릿 확정(`scripts/phase7/audit_cloud_state.sh`)
 
 ## 13. 의사결정 연계
 
@@ -264,6 +261,7 @@ Phase 7~8 항목 기준:
 - D-014: Analytics `salt` Secret Scope/Key 정의
 - D-015: 로컬 더미 `salt` 값
 - D-016: `gold.fact_payment_anonymized` 멱등성/파티셔닝 전략
+- D-018: 서비스 프린시플 실행 주체 전환 시점
 
 ## 14. 참조
 
