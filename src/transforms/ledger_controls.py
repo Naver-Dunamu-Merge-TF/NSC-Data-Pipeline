@@ -19,6 +19,7 @@ EXCEPTION_RECON = "RECON_DRIFT_HIGH"
 EXCEPTION_SUPPLY = "SUPPLY_MISMATCH"
 
 DEFAULT_FAILED_STATUSES = {"FAILED", "CANCELLED"}
+DEFAULT_REFUNDED_STATUSES = {"REFUNDED"}
 
 SUPPLY_ENTRY_SIGNS: dict[str, int] = {
     "MINT": 1,
@@ -425,6 +426,58 @@ def build_ops_payment_failure_daily(
                 "total_cnt": total,
                 "failed_cnt": failed,
                 "failure_rate": failure_rate,
+                "run_id": run_id,
+                "rule_id": rule_id,
+            }
+        )
+
+    return rows
+
+
+def build_ops_payment_refund_daily(
+    payment_orders: Iterable[Mapping[str, Any]],
+    *,
+    target_date: date,
+    run_id: str,
+    refunded_statuses: Iterable[str] | None = None,
+    rule_id: str | None = None,
+) -> list[dict[str, Any]]:
+    refunded_status_set = {
+        status for status in (refunded_statuses or DEFAULT_REFUNDED_STATUSES)
+    }
+    aggregates: dict[str | None, dict[str, int]] = {}
+
+    for record in payment_orders:
+        created_at = _parse_datetime(record.get("created_at") or record.get("event_time"))
+        if created_at is None:
+            continue
+        if date_kst(created_at) != target_date:
+            continue
+
+        merchant_name = record.get("merchant_name")
+        key = str(merchant_name) if merchant_name is not None else None
+        entry = aggregates.setdefault(key, {"total": 0, "refunded": 0})
+        entry["total"] += 1
+
+        status = record.get("status")
+        if status is not None and str(status) in refunded_status_set:
+            entry["refunded"] += 1
+
+    rows: list[dict[str, Any]] = []
+    for merchant_name, counts in aggregates.items():
+        total = counts["total"]
+        refunded = counts["refunded"]
+        refund_rate = Decimal("0")
+        if total > 0:
+            refund_rate = Decimal(str(refunded)) / Decimal(str(total))
+
+        rows.append(
+            {
+                "date_kst": target_date,
+                "merchant_name": merchant_name,
+                "total_cnt": total,
+                "refunded_cnt": refunded,
+                "refund_rate": refund_rate,
                 "run_id": run_id,
                 "rule_id": rule_id,
             }

@@ -107,6 +107,7 @@ def main() -> None:
         build_admin_tx_search,
         build_ops_ledger_pairing_quality_daily,
         build_ops_payment_failure_daily,
+        build_ops_payment_refund_daily,
         build_recon_snapshot_flow,
         build_supply_balance_daily,
     )
@@ -160,6 +161,7 @@ def main() -> None:
     recon_rows: list[dict] = []
     supply_rows: list[dict] = []
     ops_failure_rows: list[dict] = []
+    ops_refund_rows: list[dict] = []
     pairing_rows: list[dict] = []
     admin_rows: list[dict] = []
     exception_rows: list[dict] = []
@@ -199,6 +201,13 @@ def main() -> None:
                     run_id=params.run_id,
                 )
             )
+            ops_refund_rows.extend(
+                build_ops_payment_refund_daily(
+                    payment_orders,
+                    target_date=target_date,
+                    run_id=params.run_id,
+                )
+            )
             pairing_rows.append(
                 build_ops_ledger_pairing_quality_daily(
                     ledger_entries,
@@ -232,6 +241,12 @@ def main() -> None:
             catalog=args.catalog,
             table_name="gold.ops_payment_failure_daily",
             rows=ops_failure_rows,
+        )
+        _write_gold_rows(
+            spark,
+            catalog=args.catalog,
+            table_name="gold.ops_payment_refund_daily",
+            rows=ops_refund_rows,
         )
         _write_gold_rows(
             spark,

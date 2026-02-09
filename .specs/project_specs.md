@@ -186,6 +186,10 @@ PII 제거 원칙:
   - `date_kst`, `merchant_name`, `total_cnt`, `failed_cnt`, `failure_rate`, `run_id`, `rule_id`
   - 운영 지표(추가): 결제 실패율(실패 정의는 룰/합의로 고정)
 
+- `gold.ops_payment_refund_daily`
+  - `date_kst`, `merchant_name`, `total_cnt`, `refunded_cnt`, `refund_rate`, `run_id`, `rule_id`
+  - 운영 지표(추가): 환불율(실패율과 분리)
+
 - `gold.ops_ledger_pairing_quality_daily`
   - `date_kst`, `entry_cnt`, `related_id_null_rate`, `pair_candidate_rate`, `join_payment_orders_rate`, `run_id`, `rule_id`
   - 운영 지표(추가): `related_id` 기반 PAYMENT/RECEIVE 페어링 품질(방법2 가정)
@@ -276,6 +280,7 @@ PII 제거 원칙:
   - `gold.ledger_supply_balance_daily`
   - `gold.exception_ledger`에 `RECON_DRIFT_HIGH`, `SUPPLY_MISMATCH` 등 기록
   - (운영 지표) `gold.ops_payment_failure_daily`
+  - (운영 지표) `gold.ops_payment_refund_daily`
   - (운영 지표) `gold.ops_ledger_pairing_quality_daily`
   - (옵션/보조 경로) `gold.admin_tx_search`
 

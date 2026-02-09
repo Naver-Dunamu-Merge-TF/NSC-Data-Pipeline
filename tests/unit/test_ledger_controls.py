@@ -12,6 +12,7 @@ from src.transforms.ledger_controls import (
     build_admin_tx_search,
     build_ops_ledger_pairing_quality_daily,
     build_ops_payment_failure_daily,
+    build_ops_payment_refund_daily,
     build_recon_snapshot_flow,
     build_supply_balance_daily,
 )
@@ -164,6 +165,41 @@ def test_build_ops_payment_failure_daily() -> None:
     assert rows_by_merchant["M1"]["total_cnt"] == 2
     assert rows_by_merchant["M1"]["failed_cnt"] == 1
     assert rows_by_merchant[None]["failed_cnt"] == 1
+
+
+def test_build_ops_payment_refund_daily() -> None:
+    target_date = date_kst(datetime(2026, 2, 1, 0, 0, tzinfo=UTC))
+    payment_orders = [
+        {
+            "order_id": "o1",
+            "merchant_name": "M1",
+            "status": "REFUNDED",
+            "created_at": datetime(2026, 2, 1, 1, 0, tzinfo=UTC),
+        },
+        {
+            "order_id": "o2",
+            "merchant_name": "M1",
+            "status": "PAID",
+            "created_at": datetime(2026, 2, 1, 2, 0, tzinfo=UTC),
+        },
+        {
+            "order_id": "o3",
+            "status": "REFUNDED",
+            "created_at": datetime(2026, 2, 1, 3, 0, tzinfo=UTC),
+        },
+    ]
+
+    rows = build_ops_payment_refund_daily(
+        payment_orders,
+        target_date=target_date,
+        run_id="run-3",
+    )
+    rows_by_merchant = {row["merchant_name"]: row for row in rows}
+
+    assert rows_by_merchant["M1"]["total_cnt"] == 2
+    assert rows_by_merchant["M1"]["refunded_cnt"] == 1
+    assert rows_by_merchant["M1"]["refund_rate"] == Decimal("0.5")
+    assert rows_by_merchant[None]["refunded_cnt"] == 1
 
 
 def test_build_ops_ledger_pairing_quality_daily_and_admin_tx_search() -> None:

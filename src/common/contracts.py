@@ -289,6 +289,19 @@ GOLD_CONTRACTS: dict[str, TableContract] = {
         ),
         description="Daily payment failure rate by merchant.",
     ),
+    "gold.ops_payment_refund_daily": TableContract(
+        name="gold.ops_payment_refund_daily",
+        columns=(
+            ContractColumn("date_kst", "date", True),
+            ContractColumn("merchant_name", "string", False),
+            ContractColumn("total_cnt", "bigint", True),
+            ContractColumn("refunded_cnt", "bigint", True),
+            ContractColumn("refund_rate", "decimal(38,6)", True),
+            ContractColumn("run_id", "string", True),
+            ContractColumn("rule_id", "string", False),
+        ),
+        description="Daily payment refund rate by merchant.",
+    ),
     "gold.ops_ledger_pairing_quality_daily": TableContract(
         name="gold.ops_ledger_pairing_quality_daily",
         columns=(
