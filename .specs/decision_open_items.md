@@ -1,7 +1,7 @@
 # 결정 필요 항목 목록 (Open Decisions)
 
 작성일: 2026-02-05
-업데이트: 2026-02-06
+업데이트: 2026-02-09
 
 ## 목적
 구현 중 **명확히 결정되지 않았거나 가정으로 처리한 항목**을 기록하고,
@@ -21,18 +21,18 @@
 - 근거: 사용자 결정(옵션 A)
 
 ### D-002 일일 스냅샷 start/end 선택 규칙
-- 상태: **협의 필요(외부 SSOT 확인)**
-- 현재 가정: 대상 `date_kst` 내 **최소/최대 `snapshot_ts`**를 start/end로 사용
+- 상태: **결정됨(2026-02-09)**
+- 결정: 현 단계에서는 대상 `date_kst` 내 **최소/최대 `snapshot_ts`**를 start/end로 사용한다.
 - 영향: `delta_balance_total` 계산
-- 결정 필요: “일자 내 첫/마지막 스냅샷” vs “정해진 cutoff 시각” 규칙
-- 제안: 샘플 데이터/운영 수집 주기 확인 후 규칙 고정
+- 재검토 트리거: 업스트림이 “일자 cutoff 기반” 스냅샷 정책을 제공하면, cutoff 규칙으로 전환을 검토한다.
+- 근거: 사용자 결정(옵션 A)
 
 ### D-003 `issued_supply` 산정 SSOT
-- 상태: **협의 필요(외부 SSOT 확인)**
-- 현재 가정: 원장 타입(MINT/CHARGE/BURN/WITHDRAW) 합산
+- 상태: **결정됨(2026-02-09)**
+- 결정: 현 단계에서는 원장 타입(MINT/CHARGE/BURN/WITHDRAW) 합산을 `issued_supply`로 사용한다.
 - 영향: `gold.ledger_supply_balance_daily` 결과
-- 결정 필요: OLTP 발행량 스냅샷 테이블 존재 시 전환 여부
-- 제안: OLTP 스냅샷이 있으면 SSOT로 즉시 전환
+- 재검토 트리거: OLTP/정산의 발행량 스냅샷 SSOT가 제공되면, 이를 SSOT로 전환하는 개선을 검토한다.
+- 근거: 사용자 결정(옵션 A)
 
 ### D-004 게이팅 처리 정책
 - 상태: **결정됨(2026-02-06)**
@@ -60,11 +60,11 @@
 - 근거: 현 단계의 최소 안정 규칙 고정
 
 ### D-008 `ledger_entries` 멱등성 키 확장 여부
-- 상태: **협의 필요(명세 확인 후 확정)**
-- 현재 결정 초안: `silver.ledger_entries` 멱등성 키를 `(tx_id, wallet_id, entry_seq)`로 확장
-- 확인 필요: 업스트림 `entry_seq` 제공 여부 또는 deterministic 파생 규칙
-- 영향: 동일 `tx_id` 다중 엔트리 케이스 재실행 수렴 보장
-- 후속: 외부 명세/담당자 확인 후 `결정됨`으로 전환하고 `contracts/table_metadata/transforms/tests` 반영
+- 상태: **결정됨(2026-02-09)**
+- 결정: 현 단계에서는 `silver.ledger_entries` 멱등성 키를 `(tx_id, wallet_id)`로 유지한다.
+- 영향: `tx_id`는 행 단위 유니크(PK)라는 계약을 전제로 DQ에서 중복을 차단한다.
+- 재검토 트리거: 실데이터에서 “동일 `tx_id` 다중 엔트리”가 관측되면 `entry_seq`(또는 `entry_id`) 도입으로 재결정한다.
+- 근거: `.specs/data_contract.md`의 `transaction_ledger.tx_id` PK 가정 + 사용자 결정(옵션 A)
 
 ### D-009 completeness 연속 0 윈도우 상태 저장
 - 상태: **결정됨(2026-02-06)**
