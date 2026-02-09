@@ -270,7 +270,7 @@ PII 제거 원칙:
        - 2차(권장): OLTP가 제공하는 “발행량 스냅샷 테이블”이 있으면 이를 SSOT로 사용
      - `wallet_total_balance = SUM(balance_total_end)`
 - 게이팅
-  - Pipeline A가 stale/drop이면 예외 severity 하향 또는 알림 억제(계산은 수행)
+  - Pipeline A가 stale/drop이면 예외 severity는 유지하고, 알림 채널에서만 억제한다(계산은 수행).
 - 산출
   - `gold.recon_daily_snapshot_flow`
   - `gold.ledger_supply_balance_daily`

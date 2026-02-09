@@ -297,9 +297,6 @@ def build_recon_snapshot_flow(
         rows.append(row)
 
         severity = _evaluate_severity(drift_abs, recon_rule)
-        if severity and _gating_active(dq_tag):
-            if severity == SEVERITY_CRITICAL:
-                severity = SEVERITY_WARN
         if severity:
             exceptions.append(
                 _build_exception(
@@ -365,9 +362,6 @@ def build_supply_balance_daily(
 
     exceptions: list[dict[str, Any]] = []
     severity = _evaluate_severity(diff_abs, supply_rule)
-    if severity and _gating_active(dq_tag):
-        if severity == SEVERITY_CRITICAL:
-            severity = SEVERITY_WARN
     if severity:
         exceptions.append(
             _build_exception(

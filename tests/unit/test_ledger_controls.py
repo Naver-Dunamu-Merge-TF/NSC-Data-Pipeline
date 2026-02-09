@@ -88,7 +88,7 @@ def test_build_recon_snapshot_flow_and_gating() -> None:
         dq_tags=[TAG_SOURCE_STALE],
     )
     exception_gated = output_gated.exceptions[0]
-    assert exception_gated["severity"] == "WARN"
+    assert exception_gated["severity"] == "CRITICAL"
 
 
 def test_build_supply_balance_daily() -> None:
