@@ -93,6 +93,13 @@ Databricks는 결제/지갑 서비스를 “대체”하지 않고, **원장 무
 - Kafka + Schema Registry 기반
 - Structured Streaming으로 Bronze 실시간 적재
 - 전환 조건: 소스 DB 안정화 및 Kafka 인프라 구축 완료
+- **Upstream 메시지 구조 참고 (Outbox Pattern)**:
+  - 소스: [Discussion #14](https://github.com/Naver-Dunamu-Merge-TF/Document/discussions/14)
+  - OLTP 쪽에서 도메인 테이블 + outbox 테이블에 단일 트랜잭션으로 write
+  - Debezium이 WAL(Write-Ahead Log)을 읽어 Kafka 토픽으로 publish
+  - Outbox 스키마: `id (UUID) | aggregate_type | aggregate_id | type | payload (JSONB) | created_at`
+  - Kafka 매핑: `aggregate_type` → topic, `aggregate_id` → key, `type` → header, `payload` → value
+  - Phase 2 수집 시 `payload` 언래핑 및 Bronze 테이블 라우팅 설계 필요
 
 ---
 
