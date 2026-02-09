@@ -290,8 +290,8 @@ Phase 7~8 항목 기준:
 - [ ] `src/io/secret_loader.py`, `scripts/run_pipeline_c.py`, `scripts/phase7/setup_minimal_cloud.sh` 기본값을 점검한다.
 
 문서 최소 갱신:
-- [ ] `.specs/phase7_cloud_setup_status.md` 현재 환경값을 갱신한다.
-- [ ] `.specs/cloud_test_resource_naming.md` inventory/tag/TTL을 갱신한다.
+- [ ] `.specs/cloud/phase7_cloud_setup_status.md` 현재 환경값을 갱신한다.
+- [ ] `.specs/cloud/cloud_test_resource_naming.md` inventory/tag/TTL을 갱신한다.
 - [ ] 본 문서의 "삭제 전 참조값"과 "재빌드 후 현재값" 상태 문구를 함께 갱신한다.
 - [ ] 예외 운영 판단은 `.specs/decision_open_items.md`에 기록한다.
 

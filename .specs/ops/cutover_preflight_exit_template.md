@@ -1,7 +1,7 @@
 # Cutover Preflight / Exit Criteria Template
 
 Last updated: 2026-02-06  
-Reference: `.specs/cloud_migration_rebuild_plan.md`
+Reference: `.specs/cloud/cloud_migration_rebuild_plan.md`
 
 ## 1. Cutover Metadata
 

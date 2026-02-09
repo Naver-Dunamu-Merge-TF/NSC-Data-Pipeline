@@ -3,7 +3,7 @@
 ## 기준 문서
 - `.specs/project_specs.md`
 - `.specs/data_contract.md`
-- `.specs/cloud_migration_rebuild_plan.md`
+- `.specs/cloud/cloud_migration_rebuild_plan.md`
 - `.ref/database_schema`
 
 ## Phase 1 — 리포지토리 골격 + 공통 기반
@@ -90,7 +90,7 @@
 - [x] 운영/장애 대응 런북, 알림 정책 문서화
 - [x] 스키마 변경/마이그레이션 정책 문서화(Silver/Gold 명시적 변경)
 - [x] 성능/파티셔닝 점검(필요 시 최적화 반영)
-- [x] 컷오버 Preflight/Exit Criteria 템플릿 고정(참조: `.specs/cloud_migration_rebuild_plan.md`)
+- [x] 컷오버 Preflight/Exit Criteria 템플릿 고정(참조: `.specs/cloud/cloud_migration_rebuild_plan.md`)
 - [x] Commit
 
 ## Phase 11 — Secure Environment Rebuild (신규 리소스 생성)

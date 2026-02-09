@@ -101,7 +101,7 @@
 - 결정: `scope=ledger-analytics-dev`, `key=salt_user_key`
 - 후속: 운영 재구축 시 Key Vault-backed Secret Scope로 전환
 - 영향: `user_key` 익명화 구현 및 배포 환경 설정
-- 근거: `.specs/phase7_cloud_setup_status.md`, `scripts/phase7/setup_minimal_cloud.sh`
+- 근거: `.specs/cloud/phase7_cloud_setup_status.md`, `scripts/phase7/setup_minimal_cloud.sh`
 
 ### D-015 로컬 더미 `salt` 값
 - 상태: **결정됨(2026-02-06)**
@@ -114,13 +114,13 @@
 - 결정: `date_kst` 단위 `overwrite partition` 전략을 사용하고, Pipeline C에서는 대상 파티션만 교체한다.
 - 영향: 백필/재실행 시 동일 `date_kst` 범위에 대해 결과 수렴을 보장한다.
 - 후속: 운영 데이터량/지연 요구가 커지면 `MERGE` 키 전략으로 재평가한다.
-- 근거: `.specs/cloud_migration_rebuild_plan.md`, `.roadmap/implementation_roadmap.md` Phase 6
+- 근거: `.specs/cloud/cloud_migration_rebuild_plan.md`, `.roadmap/implementation_roadmap.md` Phase 6
 
 ### D-017 개발 단계 보안 하드닝 유예 범위
 - 상태: **결정됨(2026-02-06)**
 - 결정: 개발/테스트 단계에서는 퍼블릭 엔드포인트 기반 최소 구성으로 진행하고, NSG/서브넷 분리/Private Endpoint/강화된 시크릿 경로는 **개발 완료 후 재구축 단계**에서 적용
 - 영향: Phase 7의 보안 관련 산출물은 “최종 보안 구성”이 아닌 임시 구성이 될 수 있음
-- 근거: 사용자 결정 및 `.specs/cloud_migration_rebuild_plan.md`
+- 근거: 사용자 결정 및 `.specs/cloud/cloud_migration_rebuild_plan.md`
 
 ### D-018 서비스 프린시플 실행 주체 전환 시점
 - 상태: **결정됨(2026-02-06)**

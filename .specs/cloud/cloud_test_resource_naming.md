@@ -14,7 +14,7 @@ References:
 
 - `.ref/SRS - Software Requirements Specification.md`
 - `.ref/project_specs.md`
-- `.specs/cloud_migration_rebuild_plan.md`
+- `.specs/cloud/cloud_migration_rebuild_plan.md`
 
 ## 2. Scope
 

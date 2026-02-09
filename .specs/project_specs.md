@@ -699,7 +699,7 @@ configs/
 
 참조 문서:
 - `.roadmap/implementation_roadmap.md`
-- `.specs/cloud_migration_rebuild_plan.md`
+- `.specs/cloud/cloud_migration_rebuild_plan.md`
 
 | 페이즈 | 목적 | 현재 테스트 리소스에서 수행 | 주요 산출물 |
 |---|---|---|---|
