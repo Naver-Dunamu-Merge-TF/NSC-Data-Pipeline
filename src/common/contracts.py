@@ -328,6 +328,8 @@ GOLD_CONTRACTS: dict[str, TableContract] = {
             ContractColumn("last_success_ts", "timestamp", False),
             ContractColumn("last_processed_end", "timestamp", False),
             ContractColumn("last_run_id", "string", False),
+            # JSON map: {source_table: consecutive_zero_window_count}
+            ContractColumn("dq_zero_window_counts", "string", False),
             ContractColumn("updated_at", "timestamp", True),
         ),
         description="Pipeline execution state store.",

@@ -63,6 +63,8 @@ def main() -> None:
         STATE_FAILURE,
         STATE_SUCCESS,
         apply_pipeline_state,
+        parse_zero_window_counts,
+        serialize_zero_window_counts,
         write_pipeline_state_delta,
     )
     from src.io.rule_loader import load_rule_seed
@@ -112,6 +114,14 @@ def main() -> None:
     exception_rows: list[dict] = []
     pipeline_state_table = f"{args.catalog}.gold.pipeline_state"
     pipeline_contract = get_contract("gold.pipeline_state")
+    initial_state = _load_current_state(
+        spark,
+        pipeline_state_table,
+        "pipeline_a",
+    )
+    zero_window_counts = parse_zero_window_counts(
+        initial_state.dq_zero_window_counts if initial_state else None
+    )
 
     try:
         for start_ts, end_ts in params.windows_utc():
@@ -143,8 +153,9 @@ def main() -> None:
                     config=config,
                     run_id=params.run_id,
                     rules=rules,
-                    previous_zero_windows=0,
+                    previous_zero_windows=zero_window_counts.get(config.source_table, 0),
                 )
+                zero_window_counts[config.source_table] = output.zero_window_count
                 dq_rows.append(output.dq_status)
                 exception_rows.extend(output.exceptions)
 
@@ -169,6 +180,7 @@ def main() -> None:
             run_id=params.run_id,
             status=STATE_SUCCESS,
             last_processed_end=params.processed_end_utc(),
+            dq_zero_window_counts=serialize_zero_window_counts(zero_window_counts),
         )
         state_df = _align_to_contract(
             spark.createDataFrame([success_state.as_dict()]),
@@ -176,16 +188,11 @@ def main() -> None:
         )
         write_pipeline_state_delta(state_df, pipeline_state_table)
     except Exception:
-        current_state = _load_current_state(
-            spark,
-            pipeline_state_table,
-            "pipeline_a",
-        )
         failed_state = apply_pipeline_state(
             pipeline_name="pipeline_a",
             run_id=params.run_id,
             status=STATE_FAILURE,
-            current_state=current_state,
+            current_state=initial_state,
         )
         state_df = _align_to_contract(
             spark.createDataFrame([failed_state.as_dict()]),

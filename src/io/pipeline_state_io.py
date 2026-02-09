@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Mapping
@@ -17,6 +18,7 @@ class PipelineStateRecord:
     last_success_ts: datetime | None
     last_processed_end: datetime | None
     last_run_id: str | None
+    dq_zero_window_counts: str | None
     updated_at: datetime
 
     def as_dict(self) -> dict[str, Any]:
@@ -25,6 +27,7 @@ class PipelineStateRecord:
             "last_success_ts": self.last_success_ts,
             "last_processed_end": self.last_processed_end,
             "last_run_id": self.last_run_id,
+            "dq_zero_window_counts": self.dq_zero_window_counts,
             "updated_at": self.updated_at,
         }
 
@@ -50,8 +53,34 @@ def parse_pipeline_state_record(payload: Mapping[str, Any]) -> PipelineStateReco
         last_success_ts=_parse_datetime(payload.get("last_success_ts")),
         last_processed_end=_parse_datetime(payload.get("last_processed_end")),
         last_run_id=payload.get("last_run_id"),
+        dq_zero_window_counts=payload.get("dq_zero_window_counts"),
         updated_at=updated_at,
     )
+
+
+def parse_zero_window_counts(value: str | None) -> dict[str, int]:
+    if not value:
+        return {}
+    try:
+        payload = json.loads(value)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    counts: dict[str, int] = {}
+    for key, raw_value in payload.items():
+        if raw_value is None:
+            continue
+        try:
+            counts[str(key)] = max(int(raw_value), 0)
+        except (TypeError, ValueError):
+            continue
+    return counts
+
+
+def serialize_zero_window_counts(counts: Mapping[str, int]) -> str:
+    sanitized = {str(key): max(int(value), 0) for key, value in counts.items()}
+    return json.dumps(sanitized, ensure_ascii=True, sort_keys=True)
 
 
 def apply_pipeline_state(
@@ -62,6 +91,7 @@ def apply_pipeline_state(
     current_state: PipelineStateRecord | None = None,
     last_processed_end: datetime | None = None,
     event_ts: datetime | None = None,
+    dq_zero_window_counts: str | None = None,
 ) -> PipelineStateRecord:
     status_normalized = status.strip().lower()
     if status_normalized not in {STATE_SUCCESS, STATE_FAILURE}:
@@ -73,6 +103,7 @@ def apply_pipeline_state(
         last_success_ts=None,
         last_processed_end=None,
         last_run_id=None,
+        dq_zero_window_counts=None,
         updated_at=ts,
     )
 
@@ -84,6 +115,7 @@ def apply_pipeline_state(
             last_success_ts=ts,
             last_processed_end=to_utc(last_processed_end),
             last_run_id=run_id,
+            dq_zero_window_counts=dq_zero_window_counts,
             updated_at=ts,
         )
 
@@ -92,6 +124,7 @@ def apply_pipeline_state(
         last_success_ts=current.last_success_ts,
         last_processed_end=current.last_processed_end,
         last_run_id=run_id,
+        dq_zero_window_counts=current.dq_zero_window_counts,
         updated_at=ts,
     )
 

@@ -361,7 +361,8 @@ FR-ANA-02(P3). 외부 API(업비트 등) → Bronze 적재 → Gold 집계.
 
 ### 9.1 state store
 
-- `gold.pipeline_state(pipeline_name, last_success_ts, last_processed_end, last_run_id, updated_at)`
+- `gold.pipeline_state(pipeline_name, last_success_ts, last_processed_end, last_run_id, dq_zero_window_counts, updated_at)`
+  - `dq_zero_window_counts`: `{source_table: consecutive_zero_window_count}` JSON string (DQ completeness용)
 
 ### 9.2 멱등성
 
