@@ -5,8 +5,8 @@ from decimal import Decimal
 
 import pytest
 
-from src.io.bronze_io import prepare_bronze_records
 from src.common.rules import RuleDefinition
+from src.io.bronze_io import prepare_bronze_records
 from src.transforms import silver_controls
 
 
@@ -102,9 +102,7 @@ def test_enforce_bad_records_rate_raises() -> None:
         }
     )
     with pytest.raises(RuntimeError):
-        silver_controls.enforce_bad_records_rate(
-            valid_count=4, bad_count=1, rule=rule
-        )
+        silver_controls.enforce_bad_records_rate(valid_count=4, bad_count=1, rule=rule)
 
 
 def test_transform_wallet_snapshot_with_rules_sets_rule_id() -> None:
@@ -186,15 +184,11 @@ def test_wallet_snapshot_sample_from_mock_data() -> None:
         ingested_at="2026-02-01T00:10:00Z",
         source_extracted_at="2026-02-01T00:00:00Z",
     )
-    result = silver_controls.transform_wallet_snapshot_records(
-        records, run_id="run-1"
-    )
+    result = silver_controls.transform_wallet_snapshot_records(records, run_id="run-1")
     assert len(result.bad_records) == 0
     assert len(result.records) == len(records)
 
-    sample = next(
-        record for record in result.records if record["user_id"] == "user_1"
-    )
+    sample = next(record for record in result.records if record["user_id"] == "user_1")
     assert sample["balance_total"] == Decimal("1000.00")
     assert sample["snapshot_date_kst"] == date(2026, 2, 1)
     assert sample["snapshot_ts"] == datetime(2026, 2, 1, tzinfo=timezone.utc)
@@ -214,7 +208,9 @@ def test_ledger_entries_amount_signed_sample_from_mock_data() -> None:
     assert len(result.records) == len(records)
 
     payment = next(record for record in result.records if record["tx_id"] == "tx_pay_1")
-    receive = next(record for record in result.records if record["tx_id"] == "tx_recv_1")
+    receive = next(
+        record for record in result.records if record["tx_id"] == "tx_recv_1"
+    )
     assert payment["amount_signed"] == Decimal("-100.00")
     assert receive["amount_signed"] == Decimal("100.00")
     assert payment["event_date_kst"] == date(2026, 2, 1)

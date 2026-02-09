@@ -346,7 +346,9 @@ def transform_ledger_entries_records(
             )
             continue
 
-        event_time = _parse_datetime(record.get("created_at") or record.get("event_time"))
+        event_time = _parse_datetime(
+            record.get("created_at") or record.get("event_time")
+        )
         if event_time is None:
             bad.append(
                 build_bad_record(
@@ -407,9 +409,7 @@ def transform_wallet_snapshot_with_rules(
 ) -> tuple[TransformResult, float]:
     bad_rate_rule = select_rule(rules, domain="silver", metric="bad_records_rate")
     rule_id = bad_rate_rule.rule_id if bad_rate_rule else None
-    result = transform_wallet_snapshot_records(
-        records, run_id=run_id, rule_id=rule_id
-    )
+    result = transform_wallet_snapshot_records(records, run_id=run_id, rule_id=rule_id)
     bad_rate = enforce_bad_records_rate(
         valid_count=len(result.records),
         bad_count=len(result.bad_records),

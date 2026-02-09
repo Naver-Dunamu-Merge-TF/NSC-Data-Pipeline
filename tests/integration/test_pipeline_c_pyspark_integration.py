@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import date
 import hashlib
+from datetime import date
 
 import pytest
 
@@ -47,9 +47,7 @@ def test_pipeline_c_smoke_with_local_pyspark(spark) -> None:
             }
         ]
     )
-    products_df = spark.createDataFrame(
-        [{"product_id": 10, "category": "BEANS"}]
-    )
+    products_df = spark.createDataFrame([{"product_id": 10, "category": "BEANS"}])
 
     rows = build_pipeline_c_fact_rows(
         [row.asDict(recursive=True) for row in order_events_df.collect()],

@@ -75,5 +75,7 @@ def test_select_rule_prefers_current() -> None:
             "is_current": True,
         }
     )
-    selected = select_rule([rule_old, rule_new], domain="silver", metric="bad_records_rate")
+    selected = select_rule(
+        [rule_old, rule_new], domain="silver", metric="bad_records_rate"
+    )
     assert selected is rule_new

@@ -4,13 +4,13 @@ from datetime import datetime, timezone
 
 from src.common.rules import RuleDefinition
 from src.transforms.dq_guardrail import (
-    DQTableConfig,
+    SEVERITY_CRITICAL,
+    SEVERITY_WARN,
     TAG_CONTRACT,
     TAG_DUP,
     TAG_EVENT_DROP,
     TAG_SOURCE_STALE,
-    SEVERITY_WARN,
-    SEVERITY_CRITICAL,
+    DQTableConfig,
     build_dq_status,
 )
 

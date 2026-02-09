@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
 
 from src.common.contracts import SILVER_CONTRACTS
 from src.common.table_metadata import SILVER_MERGE_KEYS, SILVER_PARTITION_COLUMNS

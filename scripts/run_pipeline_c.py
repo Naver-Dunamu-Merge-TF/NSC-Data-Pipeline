@@ -5,7 +5,8 @@ import os
 import sys
 from pathlib import Path
 
-from pyspark.sql import SparkSession, functions as F
+from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
 
 
 def parse_args() -> argparse.Namespace:
@@ -90,7 +91,11 @@ def main() -> None:
 
     try:
         order_events_df = spark.table(f"{silver_schema}.order_events")
-        if params.start_ts and params.end_ts and "event_time" in order_events_df.columns:
+        if (
+            params.start_ts
+            and params.end_ts
+            and "event_time" in order_events_df.columns
+        ):
             order_events_df = order_events_df.filter(
                 (F.col("event_time") >= F.lit(params.start_ts))
                 & (F.col("event_time") < F.lit(params.end_ts))
@@ -100,9 +105,7 @@ def main() -> None:
                 F.col("event_date_kst").isin(*params.target_dates())
             )
 
-        order_events = [
-            row.asDict(recursive=True) for row in order_events_df.collect()
-        ]
+        order_events = [row.asDict(recursive=True) for row in order_events_df.collect()]
         order_items = [
             row.asDict(recursive=True)
             for row in spark.table(f"{silver_schema}.order_items").collect()
@@ -132,7 +135,9 @@ def main() -> None:
                 table_name="gold.fact_payment_anonymized",
                 mode="overwrite",
             )
-            print(f"Upserted {len(rows)} rows into {target_table} (run_id={params.run_id})")
+            print(
+                f"Upserted {len(rows)} rows into {target_table} (run_id={params.run_id})"
+            )
         else:
             print("No rows generated for gold.fact_payment_anonymized")
 

@@ -265,9 +265,7 @@ def build_recon_snapshot_flow(
     dq_tag = _resolve_dq_tag(dq_tags)
     recon_rule = select_rule(rules, domain="ledger", metric="drift_abs")
 
-    snapshot_bounds = _select_snapshot_bounds(
-        wallet_snapshots, target_date=target_date
-    )
+    snapshot_bounds = _select_snapshot_bounds(wallet_snapshots, target_date=target_date)
     net_flows = _aggregate_net_flow(ledger_entries, target_date=target_date)
 
     rows: list[dict[str, Any]] = []
@@ -329,20 +327,15 @@ def build_supply_balance_daily(
     rules: Iterable[RuleDefinition],
     dq_tags: Iterable[str] | None = None,
 ) -> SupplyOutput:
-    dq_tag = _resolve_dq_tag(dq_tags)
     supply_rule = select_rule(rules, domain="ledger", metric="supply_diff_abs")
     threshold = _resolve_threshold(supply_rule)
 
-    snapshot_bounds = _select_snapshot_bounds(
-        wallet_snapshots, target_date=target_date
-    )
+    snapshot_bounds = _select_snapshot_bounds(wallet_snapshots, target_date=target_date)
     wallet_total = sum(
         (entry["end_balance"] for entry in snapshot_bounds.values()),
         Decimal("0"),
     )
-    issued_supply = _aggregate_supply_entries(
-        ledger_entries, target_date=target_date
-    )
+    issued_supply = _aggregate_supply_entries(ledger_entries, target_date=target_date)
 
     diff_amount = issued_supply - wallet_total
     diff_abs = abs(diff_amount)
@@ -392,11 +385,15 @@ def build_ops_payment_failure_daily(
     failed_statuses: Iterable[str] | None = None,
     rule_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    failed_status_set = {status for status in (failed_statuses or DEFAULT_FAILED_STATUSES)}
+    failed_status_set = {
+        status for status in (failed_statuses or DEFAULT_FAILED_STATUSES)
+    }
     aggregates: dict[str | None, dict[str, int]] = {}
 
     for record in payment_orders:
-        created_at = _parse_datetime(record.get("created_at") or record.get("event_time"))
+        created_at = _parse_datetime(
+            record.get("created_at") or record.get("event_time")
+        )
         if created_at is None:
             continue
         if date_kst(created_at) != target_date:
@@ -448,7 +445,9 @@ def build_ops_payment_refund_daily(
     aggregates: dict[str | None, dict[str, int]] = {}
 
     for record in payment_orders:
-        created_at = _parse_datetime(record.get("created_at") or record.get("event_time"))
+        created_at = _parse_datetime(
+            record.get("created_at") or record.get("event_time")
+        )
         if created_at is None:
             continue
         if date_kst(created_at) != target_date:
@@ -525,13 +524,17 @@ def build_ops_ledger_pairing_quality_daily(
     total_groups = len(groups)
     pair_candidate_groups = 0
     for records in groups.values():
-        wallets = {record.get("wallet_id") for record in records if record.get("wallet_id")}
+        wallets = {
+            record.get("wallet_id") for record in records if record.get("wallet_id")
+        }
         if len(records) == 2 and len(wallets) == 2:
             pair_candidate_groups += 1
 
     pair_candidate_rate = Decimal("0")
     if total_groups:
-        pair_candidate_rate = Decimal(str(pair_candidate_groups)) / Decimal(str(total_groups))
+        pair_candidate_rate = Decimal(str(pair_candidate_groups)) / Decimal(
+            str(total_groups)
+        )
 
     join_rate = Decimal("0")
     if payment_orders is not None and total_groups:

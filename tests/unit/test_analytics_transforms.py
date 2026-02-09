@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import date
 from decimal import Decimal
-import hashlib
 
 from src.transforms import analytics
 
@@ -36,7 +36,9 @@ def test_transform_order_events_records_combines_sources() -> None:
     sources = {record["order_source"] for record in result.records}
     assert sources == {"ORDERS", "PAYMENT_ORDERS"}
     assert all(record["order_ref"] == "101" for record in result.records)
-    assert all(record["event_date_kst"] == date(2026, 2, 1) for record in result.records)
+    assert all(
+        record["event_date_kst"] == date(2026, 2, 1) for record in result.records
+    )
     assert result.bad_records == []
 
 

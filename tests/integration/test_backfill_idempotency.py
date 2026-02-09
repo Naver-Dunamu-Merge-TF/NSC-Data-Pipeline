@@ -118,9 +118,9 @@ def test_pipeline_b_two_day_backfill_idempotency() -> None:
         supply_run1 = _merge_rows(supply_run1, [supply_output_1.row], ("date_kst",))
         supply_run2 = _merge_rows(supply_run2, [supply_output_2.row], ("date_kst",))
 
-    assert _sorted(
-        _normalize_run_id(recon_run1), ("date_kst", "user_id")
-    ) == _sorted(_normalize_run_id(recon_run2), ("date_kst", "user_id"))
+    assert _sorted(_normalize_run_id(recon_run1), ("date_kst", "user_id")) == _sorted(
+        _normalize_run_id(recon_run2), ("date_kst", "user_id")
+    )
     assert _sorted(_normalize_run_id(supply_run1), ("date_kst",)) == _sorted(
         _normalize_run_id(supply_run2), ("date_kst",)
     )
@@ -148,8 +148,20 @@ def test_pipeline_c_backfill_partition_result_converges() -> None:
         },
     ]
     order_items = [
-        {"item_id": 1, "order_ref": "o1", "product_id": 10, "quantity": 1, "price_at_purchase": "100.00"},
-        {"item_id": 2, "order_ref": "o2", "product_id": 20, "quantity": 1, "price_at_purchase": "200.00"},
+        {
+            "item_id": 1,
+            "order_ref": "o1",
+            "product_id": 10,
+            "quantity": 1,
+            "price_at_purchase": "100.00",
+        },
+        {
+            "item_id": 2,
+            "order_ref": "o2",
+            "product_id": 20,
+            "quantity": 1,
+            "price_at_purchase": "200.00",
+        },
     ]
     products = [
         {"product_id": 10, "category": "A"},

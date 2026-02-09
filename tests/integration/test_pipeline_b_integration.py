@@ -100,9 +100,9 @@ def test_recon_supply_results_and_idempotency() -> None:
     merged_twice = _merge_rows(
         merged_once, recon_output_2.rows, ("date_kst", "user_id")
     )
-    assert _sorted(
-        _normalize_run_id(merged_once), ("date_kst", "user_id")
-    ) == _sorted(_normalize_run_id(merged_twice), ("date_kst", "user_id"))
+    assert _sorted(_normalize_run_id(merged_once), ("date_kst", "user_id")) == _sorted(
+        _normalize_run_id(merged_twice), ("date_kst", "user_id")
+    )
 
     supply_output_1 = build_supply_balance_daily(
         wallet_snapshots,
@@ -127,6 +127,6 @@ def test_recon_supply_results_and_idempotency() -> None:
     merged_supply_twice = _merge_rows(
         merged_supply_once, [supply_output_2.row], ("date_kst",)
     )
-    assert _sorted(
-        _normalize_run_id(merged_supply_once), ("date_kst",)
-    ) == _sorted(_normalize_run_id(merged_supply_twice), ("date_kst",))
+    assert _sorted(_normalize_run_id(merged_supply_once), ("date_kst",)) == _sorted(
+        _normalize_run_id(merged_supply_twice), ("date_kst",)
+    )

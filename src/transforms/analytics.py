@@ -109,7 +109,9 @@ def transform_order_events_records(
             )
             continue
 
-        event_time = _parse_datetime(record.get("created_at") or record.get("event_time"))
+        event_time = _parse_datetime(
+            record.get("created_at") or record.get("event_time")
+        )
         valid.append(
             {
                 "order_ref": str(order_id),
@@ -137,7 +139,9 @@ def transform_order_events_records(
             )
             continue
 
-        event_time = _parse_datetime(record.get("created_at") or record.get("event_time"))
+        event_time = _parse_datetime(
+            record.get("created_at") or record.get("event_time")
+        )
         valid.append(
             {
                 "order_ref": str(order_id),

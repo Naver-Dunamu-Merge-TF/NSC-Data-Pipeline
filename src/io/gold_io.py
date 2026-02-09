@@ -76,7 +76,9 @@ def _render_partition_literal(value: object) -> str:
     return str(value)
 
 
-def _build_replace_where(df, partition_columns: Iterable[str]) -> str | None:  # pragma: no cover
+def _build_replace_where(
+    df, partition_columns: Iterable[str]
+) -> str | None:  # pragma: no cover
     columns = tuple(partition_columns)
     if len(columns) != 1:
         raise ValueError("overwrite_partitions supports exactly one partition column")

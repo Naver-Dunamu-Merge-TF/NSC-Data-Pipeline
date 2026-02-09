@@ -6,7 +6,8 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
-from pyspark.sql import SparkSession, functions as F
+from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
 
 
 def parse_args() -> argparse.Namespace:

@@ -92,9 +92,7 @@ def load_bronze_records(
     base_dir: Path | str = DEFAULT_BRONZE_BASE_DIR,
     file_glob: str = DEFAULT_FILE_GLOB,
 ) -> list[dict[str, Any]]:
-    files = discover_bronze_files(
-        table_name, base_dir=base_dir, file_glob=file_glob
-    )
+    files = discover_bronze_files(table_name, base_dir=base_dir, file_glob=file_glob)
     return load_jsonl_records(files.data_files)
 
 
@@ -230,7 +228,7 @@ def _to_spark_paths(paths: Iterable[Path]) -> list[str]:
     for path in paths:
         path_str = str(path)
         if path_str.startswith("/dbfs/"):
-            resolved.append(f"dbfs:/{path_str[len('/dbfs/'):]}")
+            resolved.append(f"dbfs:/{path_str[len('/dbfs/') :]}")
         else:
             resolved.append(path_str)
     return resolved

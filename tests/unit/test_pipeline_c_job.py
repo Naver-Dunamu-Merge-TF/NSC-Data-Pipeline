@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import date
 import hashlib
+from datetime import date
 
 from src.io.secret_loader import LOCAL_DUMMY_SALT
 from src.jobs.pipeline_c import build_pipeline_c_fact_rows

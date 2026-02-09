@@ -5,7 +5,8 @@ import os
 import sys
 from pathlib import Path
 
-from pyspark.sql import SparkSession, functions as F
+from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
 
 
 def parse_args() -> argparse.Namespace:
@@ -153,7 +154,9 @@ def main() -> None:
                     config=config,
                     run_id=params.run_id,
                     rules=rules,
-                    previous_zero_windows=zero_window_counts.get(config.source_table, 0),
+                    previous_zero_windows=zero_window_counts.get(
+                        config.source_table, 0
+                    ),
                 )
                 zero_window_counts[config.source_table] = output.zero_window_count
                 dq_rows.append(output.dq_status)

@@ -248,7 +248,9 @@ def _build_exception(
         "window_start_ts": to_utc(config.window_start_ts),
         "window_end_ts": to_utc(config.window_end_ts),
         "metric": metric,
-        "metric_value": Decimal(str(metric_value)) if metric_value is not None else None,
+        "metric_value": Decimal(str(metric_value))
+        if metric_value is not None
+        else None,
         "message": json.dumps({"metric": metric, "value": metric_value}),
         "run_id": run_id,
         "rule_id": rule_id,
@@ -291,9 +293,7 @@ def build_dq_status(
     completeness_rule = select_rule(
         rules, domain="dq", metric="completeness_zero_windows"
     )
-    contract_rule = select_rule(
-        rules, domain="dq", metric="contract_bad_records_rate"
-    )
+    contract_rule = select_rule(rules, domain="dq", metric="contract_bad_records_rate")
 
     event_count = len(records_list)
     zero_windows = previous_zero_windows + 1 if event_count == 0 else 0
@@ -342,7 +342,8 @@ def build_dq_status(
         "dq_tag": dq_tag,
         "severity": severity,
         "run_id": run_id,
-        "rule_id": dq_tag and _resolve_rule_id(
+        "rule_id": dq_tag
+        and _resolve_rule_id(
             dq_tag,
             freshness_rule=freshness_rule,
             dup_rule=dup_rule,

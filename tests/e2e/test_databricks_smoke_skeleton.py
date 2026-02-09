@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-
 REQUIRED_ENV = (
     "DATABRICKS_HOST",
     "DATABRICKS_TOKEN",

@@ -16,9 +16,7 @@ def test_normalize_table_name_accepts_short_name() -> None:
 
 
 def test_silver_partition_columns() -> None:
-    assert silver_partition_columns("silver.wallet_snapshot") == (
-        "snapshot_date_kst",
-    )
+    assert silver_partition_columns("silver.wallet_snapshot") == ("snapshot_date_kst",)
     assert silver_partition_columns("ledger_entries") == ("event_date_kst",)
     assert silver_partition_columns("order_events") == ("event_date_kst",)
     assert silver_partition_columns("silver.order_items") == ()

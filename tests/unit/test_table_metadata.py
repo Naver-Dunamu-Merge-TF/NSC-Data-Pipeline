@@ -24,12 +24,8 @@ def test_silver_merge_keys_contains_expected_tables() -> None:
 
 
 def test_silver_partition_columns() -> None:
-    assert SILVER_PARTITION_COLUMNS["silver.wallet_snapshot"] == (
-        "snapshot_date_kst",
-    )
-    assert SILVER_PARTITION_COLUMNS["silver.ledger_entries"] == (
-        "event_date_kst",
-    )
+    assert SILVER_PARTITION_COLUMNS["silver.wallet_snapshot"] == ("snapshot_date_kst",)
+    assert SILVER_PARTITION_COLUMNS["silver.ledger_entries"] == ("event_date_kst",)
     assert SILVER_PARTITION_COLUMNS["silver.order_events"] == ("event_date_kst",)
     assert SILVER_PARTITION_COLUMNS["silver.order_items"] == ()
     assert SILVER_PARTITION_COLUMNS["silver.products"] == ()

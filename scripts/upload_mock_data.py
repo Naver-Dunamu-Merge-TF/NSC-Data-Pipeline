@@ -90,9 +90,7 @@ def main() -> None:
     spark = get_spark_session()
 
     if not args.skip_create_schema:
-        spark.sql(
-            f"CREATE SCHEMA IF NOT EXISTS {args.catalog}.{args.schema}"
-        )
+        spark.sql(f"CREATE SCHEMA IF NOT EXISTS {args.catalog}.{args.schema}")
 
     batch_id = args.batch_id or default_batch_id()
     table_names = resolve_tables(args.tables)
@@ -107,9 +105,7 @@ def main() -> None:
             batch_id=batch_id,
             source_system=args.source_system,
         )
-        table_fqn = (
-            f"{args.catalog}.{args.schema}.{bronze_short_name(table_name)}"
-        )
+        table_fqn = f"{args.catalog}.{args.schema}.{bronze_short_name(table_name)}"
         write_bronze_delta(df, table_fqn)
         print(f"Uploaded {table_name} -> {table_fqn}")
 
