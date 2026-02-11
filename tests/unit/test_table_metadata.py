@@ -30,6 +30,7 @@ def test_silver_partition_columns() -> None:
     assert SILVER_PARTITION_COLUMNS["silver.order_items"] == ()
     assert SILVER_PARTITION_COLUMNS["silver.products"] == ()
     assert SILVER_PARTITION_COLUMNS["silver.bad_records"] == ("detected_date_kst",)
+    assert SILVER_PARTITION_COLUMNS["silver.dq_status"] == ("date_kst",)
 
 
 def test_gold_merge_keys_and_partitions() -> None:

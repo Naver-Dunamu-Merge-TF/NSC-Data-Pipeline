@@ -229,80 +229,16 @@ def _set_status(stage: str, **extra: object) -> None:
     _write_dbfs_status(payload)
 
 
-def _quote_sql_ident(value: str) -> str:
-    escaped = value.replace("`", "``")
-    return f"`{escaped}`"
+def _create_schemas(spark, catalog: str) -> None:
+    from src.io.catalog_bootstrap import create_schemas
 
-
-def _quote_table_fqn(table_fqn: str) -> str:
-    return ".".join(_quote_sql_ident(part) for part in table_fqn.split(".") if part)
-
-
-def _create_delta_table_if_missing(
-    spark,
-    *,
-    table_fqn: str,
-    contract,
-    partition_columns: tuple[str, ...] = (),
-) -> None:
-    """Create a Delta table with an explicit schema before loading data.
-
-    This avoids Spark's DataFrameWriter CREATE TABLE path (saveAsTable/CTAS) which
-    has shown Unity Catalog SAS token timing issues on some managed ADLS roots.
-    """
-
-    quoted_table = _quote_table_fqn(table_fqn)
-    column_defs = ", ".join(
-        f"{_quote_sql_ident(column.name)} {column.data_type}"
-        for column in contract.columns
-    )
-    ddl = f"CREATE TABLE IF NOT EXISTS {quoted_table} ({column_defs}) USING DELTA"
-    if partition_columns:
-        parts = ", ".join(_quote_sql_ident(column) for column in partition_columns)
-        ddl += f" PARTITIONED BY ({parts})"
-    spark.sql(ddl)
+    create_schemas(spark, catalog)
 
 
 def _ensure_known_tables(spark, catalog: str) -> None:
-    from src.common.contracts import BRONZE_CONTRACTS, GOLD_CONTRACTS, SILVER_CONTRACTS
-    from src.common.table_metadata import (
-        GOLD_PARTITION_COLUMNS,
-        SILVER_PARTITION_COLUMNS,
-    )
+    from src.io.catalog_bootstrap import create_all_tables
 
-    for table_name, contract in BRONZE_CONTRACTS.items():
-        short_name = table_name.split(".", maxsplit=1)[1]
-        _create_delta_table_if_missing(
-            spark,
-            table_fqn=f"{catalog}.bronze.{short_name}",
-            contract=contract,
-        )
-
-    for table_name, contract in SILVER_CONTRACTS.items():
-        short_name = table_name.split(".", maxsplit=1)[1]
-        partition_columns = SILVER_PARTITION_COLUMNS.get(table_name, ())
-        if table_name == "silver.dq_status":
-            partition_columns = ("date_kst",)
-        _create_delta_table_if_missing(
-            spark,
-            table_fqn=f"{catalog}.silver.{short_name}",
-            contract=contract,
-            partition_columns=partition_columns,
-        )
-
-    for table_name, contract in GOLD_CONTRACTS.items():
-        short_name = table_name.split(".", maxsplit=1)[1]
-        _create_delta_table_if_missing(
-            spark,
-            table_fqn=f"{catalog}.gold.{short_name}",
-            contract=contract,
-            partition_columns=GOLD_PARTITION_COLUMNS.get(table_name, ()),
-        )
-
-
-def _create_schemas(spark, catalog: str) -> None:
-    for schema in ("bronze", "silver", "gold"):
-        spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}")
+    create_all_tables(spark, catalog)
 
 
 def _drop_known_tables(spark, catalog: str) -> None:

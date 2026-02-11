@@ -328,6 +328,28 @@ resources:
               - "--drop-schemas"
               - "{{job.parameters.drop_schemas}}"
 
+    bootstrap_catalog:
+      name: data-pipeline-bootstrap-${bundle.target}
+      max_concurrent_runs: 1
+      timeout_seconds: 600
+      job_clusters:
+        - job_cluster_key: policy_single_node
+          new_cluster:
+            spark_version: "16.4.x-scala2.12"
+            autoscale:
+              min_workers: 1
+              max_workers: 2
+            node_type_id: Standard_DS3_v2
+            policy_id: ${var.cluster_policy_id}
+      tasks:
+        - task_key: bootstrap_schemas_and_tables
+          job_cluster_key: policy_single_node
+          spark_python_task:
+            python_file: scripts/bootstrap_catalog.py
+            parameters:
+              - "--catalog"
+              - "${var.catalog}"
+
     e2e_full_pipeline:
       name: data-pipeline-e2e-full-${bundle.target}
       max_concurrent_runs: 1

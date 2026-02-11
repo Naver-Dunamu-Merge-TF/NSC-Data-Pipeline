@@ -15,6 +15,7 @@ SILVER_PARTITION_COLUMNS: dict[str, tuple[str, ...]] = {
     "silver.order_items": (),
     "silver.products": (),
     "silver.bad_records": ("detected_date_kst",),
+    "silver.dq_status": ("date_kst",),
 }
 
 GOLD_MERGE_KEYS: dict[str, tuple[str, ...]] = {
