@@ -61,7 +61,8 @@ def write_silver_delta(  # pragma: no cover
         merge_delta_table(df, table_fqn, config.merge_keys)
         return
 
-    writer = df.write.format("delta").mode(mode)
+    # See src/io/bronze_io.py for rationale: avoid atomic replace on first create.
+    writer = df.write.format("delta").mode("append")
     if config.partition_columns:
         writer = writer.partitionBy(*config.partition_columns)
     writer.saveAsTable(table_fqn)

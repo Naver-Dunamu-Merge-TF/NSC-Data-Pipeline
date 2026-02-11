@@ -111,12 +111,21 @@ def write_gold_delta(  # pragma: no cover
         merge_delta_table(df, table_fqn, config.merge_keys)
         return
 
-    writer = df.write.format("delta").mode(mode)
+    # Avoid atomic replace semantics on initial CREATE TABLE (Unity Catalog + ADLS).
+    effective_mode = mode if table_exists else "append"
+    writer = df.write.format("delta").mode(effective_mode)
     if config.partition_columns:
         writer = writer.partitionBy(*config.partition_columns)
 
     if table_exists and config.write_strategy == "overwrite_partitions":
         replace_where = _build_replace_where(df, config.partition_columns)
-        if replace_where:
-            writer = writer.option("replaceWhere", replace_where)
+        if not replace_where:
+            # Safety: prevent accidental full table overwrites when we expected
+            # partition-scoped replacement.
+            raise ValueError(
+                "overwrite_partitions strategy requires non-empty partition values "
+                f"to build replaceWhere (table={table_fqn}, "
+                f"partition_columns={config.partition_columns})"
+            )
+        writer = writer.option("replaceWhere", replace_where)
     writer.saveAsTable(table_fqn)

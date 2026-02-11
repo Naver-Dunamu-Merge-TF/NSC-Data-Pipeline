@@ -252,7 +252,20 @@ def write_bronze_delta(  # pragma: no cover
     mode: str = "append",
     merge_schema: bool = True,
 ) -> None:
-    writer = df.write.format("delta").mode(mode)
-    if merge_schema:
+    # Unity Catalog + ADLS managed locations can fail during CREATE TABLE when using
+    # `mode("overwrite")` because Spark may execute an atomic replace flow that
+    # requests table-scoped SAS tokens before the table metadata is committed.
+    # For first-time table creation, `append` is equivalent and avoids that path.
+    spark = df.sparkSession
+    table_exists = spark.catalog.tableExists(table_fqn)
+
+    effective_mode = mode
+    if not table_exists:
+        effective_mode = "append"
+
+    writer = df.write.format("delta").mode(effective_mode)
+    # Avoid `mergeSchema` on first CREATE TABLE in Unity Catalog managed locations:
+    # it can trigger a DeltaLog read on an uncommitted/staged table path.
+    if merge_schema and table_exists:
         writer = writer.option("mergeSchema", "true")
     writer.saveAsTable(table_fqn)

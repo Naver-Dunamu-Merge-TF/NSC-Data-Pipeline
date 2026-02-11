@@ -57,3 +57,11 @@ def test_resolve_user_key_salt_raises_without_fallback() -> None:
             dbutils=_DbutilsStub(raise_error=True),
             allow_local_fallback=False,
         )
+
+
+def test_resolve_user_key_salt_fails_closed_in_databricks_runtime() -> None:
+    with pytest.raises(RuntimeError):
+        resolve_user_key_salt(
+            env={"DATABRICKS_RUNTIME_VERSION": "13.3"},
+            dbutils=_DbutilsStub(raise_error=True),
+        )

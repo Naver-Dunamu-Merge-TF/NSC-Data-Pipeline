@@ -139,4 +139,5 @@ def write_pipeline_state_delta(  # pragma: no cover
     if spark.catalog.tableExists(table_fqn):
         merge_delta_table(df, table_fqn, ("pipeline_name",))
         return
-    df.write.format("delta").mode(mode).saveAsTable(table_fqn)
+    # Avoid atomic replace semantics on initial CREATE TABLE (Unity Catalog + ADLS).
+    df.write.format("delta").mode("append").saveAsTable(table_fqn)

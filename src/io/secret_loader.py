@@ -8,6 +8,15 @@ DEFAULT_SECRET_SCOPE = "ledger-analytics-dev"
 DEFAULT_SECRET_KEY = "salt_user_key"
 LOCAL_DUMMY_SALT = "local-salt-v1"
 ENV_ANON_SALT = "ANON_USER_KEY_SALT"
+ENV_DATABRICKS_RUNTIME_VERSION = "DATABRICKS_RUNTIME_VERSION"
+
+
+def _is_databricks_runtime(env_map: Mapping[str, str]) -> bool:
+    # Databricks sets runtime env vars on clusters; notebooks also provide a
+    # global dbutils object. Prefer fail-closed behavior in those contexts.
+    if env_map.get(ENV_DATABRICKS_RUNTIME_VERSION):
+        return True
+    return getattr(builtins, "dbutils", None) is not None
 
 
 def _try_get_dbutils():
@@ -39,6 +48,7 @@ def resolve_user_key_salt(
     allow_local_fallback: bool = True,
 ) -> str:
     env_map = env if env is not None else os.environ
+    in_databricks = _is_databricks_runtime(env_map)
     env_salt = env_map.get(ENV_ANON_SALT)
     if env_salt:
         return env_salt
@@ -53,8 +63,10 @@ def resolve_user_key_salt(
             return secret_value
 
     if allow_local_fallback:
-        return LOCAL_DUMMY_SALT
+        if not in_databricks:
+            return LOCAL_DUMMY_SALT
 
     raise RuntimeError(
-        "Unable to resolve anonymization salt from env or Databricks secret scope"
+        "Unable to resolve anonymization salt from env or Databricks secret scope "
+        f"(scope={secret_scope}, key={secret_key})"
     )

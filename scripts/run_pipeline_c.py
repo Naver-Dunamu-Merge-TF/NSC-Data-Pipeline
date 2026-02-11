@@ -9,6 +9,31 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
 
+def _default_repo_root() -> Path:
+    """Best-effort repo root resolution for Databricks Jobs/Bundles."""
+    candidates: list[Path] = []
+
+    file_name = globals().get("__file__") or _default_repo_root.__code__.co_filename
+    if file_name:
+        candidates.append(Path(file_name))
+
+    if sys.argv and sys.argv[0]:
+        candidates.append(Path(sys.argv[0]))
+
+    candidates.append(Path.cwd())
+
+    env_root = os.environ.get("PIPELINE_ROOT")
+    if env_root:
+        candidates.append(Path(env_root))
+
+    for base in candidates:
+        for probe in (base, base.parent, *base.parents):
+            if (probe / "src").is_dir() and (probe / "mock_data").is_dir():
+                return probe
+
+    return Path(env_root or "/dbfs/tmp/data-pipeline")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run Pipeline C (Analytics anonymized mart) in Databricks."
@@ -25,9 +50,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--secret-key", default="salt_user_key")
     parser.add_argument(
         "--repo-root",
-        default=os.environ.get("PIPELINE_ROOT", "/dbfs/tmp/data-pipeline"),
+        default=str(_default_repo_root()),
     )
     return parser.parse_args()
+
+
+def _contract_schema(contract):
+    """Build a Spark StructType from a TableContract."""
+    from pyspark.sql.types import StructType
+
+    _type_map = {"bigint": "long", "int": "integer"}
+    schema = StructType()
+    for col in contract.columns:
+        spark_type = _type_map.get(col.data_type, col.data_type)
+        schema.add(col.name, spark_type, nullable=True)
+    return schema
 
 
 def _align_to_contract(df, contract):
@@ -127,7 +164,10 @@ def main() -> None:
 
         if rows:
             contract = get_contract("gold.fact_payment_anonymized")
-            df = _align_to_contract(spark.createDataFrame(rows), contract)
+            df = _align_to_contract(
+                spark.createDataFrame(rows, schema=_contract_schema(contract)),
+                contract,
+            )
             target_table = f"{args.catalog}.gold.fact_payment_anonymized"
             write_gold_delta(
                 df,
@@ -148,7 +188,10 @@ def main() -> None:
             last_processed_end=params.processed_end_utc(),
         )
         state_df = _align_to_contract(
-            spark.createDataFrame([success_state.as_dict()]),
+            spark.createDataFrame(
+                [success_state.as_dict()],
+                schema=_contract_schema(pipeline_contract),
+            ),
             pipeline_contract,
         )
         write_pipeline_state_delta(state_df, pipeline_state_table)
@@ -165,7 +208,10 @@ def main() -> None:
             current_state=current_state,
         )
         state_df = _align_to_contract(
-            spark.createDataFrame([failed_state.as_dict()]),
+            spark.createDataFrame(
+                [failed_state.as_dict()],
+                schema=_contract_schema(pipeline_contract),
+            ),
             pipeline_contract,
         )
         write_pipeline_state_delta(state_df, pipeline_state_table)
