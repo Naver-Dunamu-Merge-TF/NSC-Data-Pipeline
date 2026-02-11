@@ -181,8 +181,8 @@ def _strip_generated_at(exceptions: list[dict]) -> list[dict]:
 
 
 def test_exception_ledger_idempotency() -> None:
-    """Recon exceptions from two runs merge identically when keyed by
-    (date_kst, domain, exception_type, run_id)."""
+    """Recon exceptions merge identically when keyed by
+    (date_kst, domain, exception_type, run_id, metric, message)."""
     wallet_snapshots = [
         {
             "snapshot_ts": datetime(2026, 2, 1, 0, 0, tzinfo=UTC),
@@ -194,6 +194,16 @@ def test_exception_ledger_idempotency() -> None:
             "user_id": "u1",
             "balance_total": Decimal("150"),
         },
+        {
+            "snapshot_ts": datetime(2026, 2, 1, 0, 30, tzinfo=UTC),
+            "user_id": "u2",
+            "balance_total": Decimal("200"),
+        },
+        {
+            "snapshot_ts": datetime(2026, 2, 1, 12, 30, tzinfo=UTC),
+            "user_id": "u2",
+            "balance_total": Decimal("260"),
+        },
     ]
     ledger_entries = [
         {
@@ -202,6 +212,13 @@ def test_exception_ledger_idempotency() -> None:
             "entry_type": "MINT",
             "amount": Decimal("40"),
             "event_time": datetime(2026, 2, 1, 2, 0, tzinfo=UTC),
+        },
+        {
+            "wallet_id": "u2",
+            "amount_signed": Decimal("50"),
+            "entry_type": "MINT",
+            "amount": Decimal("50"),
+            "event_time": datetime(2026, 2, 1, 2, 30, tzinfo=UTC),
         },
     ]
     rules = load_default_rule_seed()
@@ -222,10 +239,18 @@ def test_exception_ledger_idempotency() -> None:
         rules=rules,
     )
 
-    assert len(output_1.exceptions) > 0
-    assert output_1.exceptions[0]["exception_type"] == EXCEPTION_RECON
+    assert len(output_1.exceptions) >= 2
+    assert all(exc["exception_type"] == EXCEPTION_RECON for exc in output_1.exceptions)
+    assert len({exc["message"] for exc in output_1.exceptions}) >= 2
 
-    exception_keys = ("date_kst", "domain", "exception_type", "run_id")
+    exception_keys = (
+        "date_kst",
+        "domain",
+        "exception_type",
+        "run_id",
+        "metric",
+        "message",
+    )
     merged_once = merge_rows(
         [], _strip_generated_at(output_1.exceptions), exception_keys
     )

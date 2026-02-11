@@ -3,7 +3,7 @@
 > **SSOT(요구사항)**: `.specs/SRS - Software Requirements Specification.md` (v1.1, 2026-01-30)  
 > **SSOT(스키마 맥락)**: `.specs/database_schema`  
 > **연계 문서**: `.specs/project_specs.md` (Databricks 스펙/파이프라인)  
-> **Last Updated**: 2026-02-04  
+> **Last Updated**: 2026-02-11  
 > **범위**: SRS 2.3(원장 및 관리자), 2.4(Analytics - OLAP)
 
 ---
@@ -355,6 +355,50 @@ Databricks에서 일일 대사(Δ잔고 = 순흐름)를 하기 위해서는 아�
 | `join_payment_orders_rate` | `decimal(38,6)` | ✅ | `related_id`→`payment_orders.order_id` 조인 성공 비율(가능 시) |
 | `run_id` | `string` | ✅ | 실행 추적 |
 | `rule_id` | `string` | ⭕️ | 적용 룰 |
+
+### 4.7 `gold.exception_ledger` (공통 예외 원장)
+
+| 컬럼 | 타입(권장) | 필수 | 의미 |
+|---|---|---:|---|
+| `date_kst` | `date` | ✅ | 대상 일자 |
+| `domain` | `string` | ✅ | 예외 도메인(`dq`, `ledger`, `analytics`) |
+| `exception_type` | `string` | ✅ | 예외 유형 |
+| `severity` | `string` | ✅ | 심각도(`WARN`, `CRITICAL`) |
+| `source_table` | `string` | ⭕️ | 발생 소스 테이블 |
+| `window_start_ts` | `timestamp` | ⭕️ | 감시/집계 시작 시각 |
+| `window_end_ts` | `timestamp` | ⭕️ | 감시/집계 종료 시각 |
+| `metric` | `string` | ⭕️ | 예외 판단 메트릭 |
+| `metric_value` | `decimal(38,6)` | ⭕️ | 메트릭 값 |
+| `message` | `string` | ⭕️ | 상세 payload(JSON 문자열) |
+| `run_id` | `string` | ✅ | 실행 추적 |
+| `rule_id` | `string` | ⭕️ | 적용 룰 |
+| `generated_at` | `timestamp` | ✅ | 예외 생성 시각(UTC) |
+
+**키(멱등성)**
+
+- Pipeline A: append 기록(동일 윈도우/동일 `run_id` 재실행 시 누적 가능)
+- Pipeline B: MERGE key = `(date_kst, domain, exception_type, run_id, metric, message)`
+  (동일 `run_id` 재실행 허용, 동일 입력 기준 수렴)
+
+### 4.8 `gold.dim_rule_scd2` (룰 SSOT, SCD2)
+
+| 컬럼 | 타입(권장) | 필수 | 의미 |
+|---|---|---:|---|
+| `rule_id` | `string` | ✅ | 룰 식별자(버전 포함 권장) |
+| `domain` | `string` | ✅ | 룰 도메인(`dq`, `silver`, `ledger`) |
+| `metric` | `string` | ✅ | 룰 대상 메트릭 |
+| `threshold` | `double` | ⭕️ | 기본 임계치 |
+| `severity_map` | `map<string,double>` | ⭕️ | 단계별 임계치(`warn/crit/fail`) |
+| `allowed_values` | `array<string>` | ⭕️ | 허용값 집합 |
+| `comment` | `string` | ⭕️ | 운영 메모 |
+| `effective_start_ts` | `timestamp` | ✅ | 효력 시작 시각(UTC) |
+| `effective_end_ts` | `timestamp` | ⭕️ | 효력 종료 시각(UTC) |
+| `is_current` | `boolean` | ✅ | 현재 룰 여부 |
+
+운영 규칙:
+- 동일 `domain+metric`에서 `is_current=true`는 1건만 허용한다.
+- `rule_id`는 전 테이블에서 유일해야 한다.
+- Pipeline A/B 런타임 룰 SSOT는 `gold.dim_rule_scd2`이며, fallback은 운영 정책으로 제어한다.
 
 ---
 

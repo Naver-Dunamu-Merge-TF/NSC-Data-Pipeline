@@ -21,13 +21,21 @@ SILVER_PARTITION_COLUMNS: dict[str, tuple[str, ...]] = {
 GOLD_MERGE_KEYS: dict[str, tuple[str, ...]] = {
     "gold.recon_daily_snapshot_flow": ("date_kst", "user_id"),
     "gold.ledger_supply_balance_daily": ("date_kst",),
-    "gold.exception_ledger": ("date_kst", "domain", "exception_type", "run_id"),
+    "gold.exception_ledger": (
+        "date_kst",
+        "domain",
+        "exception_type",
+        "run_id",
+        "metric",
+        "message",
+    ),
     "gold.pipeline_state": ("pipeline_name",),
     "gold.ops_payment_failure_daily": ("date_kst", "merchant_name"),
     "gold.ops_payment_refund_daily": ("date_kst", "merchant_name"),
     "gold.ops_ledger_pairing_quality_daily": ("date_kst",),
     "gold.admin_tx_search": ("event_date_kst", "tx_id"),
     "gold.fact_payment_anonymized": (),
+    "gold.dim_rule_scd2": ("rule_id",),
 }
 
 GOLD_PARTITION_COLUMNS: dict[str, tuple[str, ...]] = {
@@ -40,6 +48,7 @@ GOLD_PARTITION_COLUMNS: dict[str, tuple[str, ...]] = {
     "gold.ops_ledger_pairing_quality_daily": ("date_kst",),
     "gold.admin_tx_search": ("event_date_kst",),
     "gold.fact_payment_anonymized": ("date_kst",),
+    "gold.dim_rule_scd2": (),
 }
 
 GOLD_WRITE_STRATEGY: dict[str, str] = {
@@ -52,4 +61,5 @@ GOLD_WRITE_STRATEGY: dict[str, str] = {
     "gold.ops_ledger_pairing_quality_daily": "merge",
     "gold.admin_tx_search": "merge",
     "gold.fact_payment_anonymized": "overwrite_partitions",
+    "gold.dim_rule_scd2": "merge",
 }

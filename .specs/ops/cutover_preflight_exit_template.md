@@ -21,6 +21,7 @@ Reference: `.specs/cloud/cloud_migration_rebuild_plan.md`
 - [ ] Bootstrap job(`bootstrap_catalog`) 배포 완료 확인
 - [ ] `sync_dim_rule_scd2` job 배포 + 실행 경로 확인
 - [ ] `gold.dim_rule_scd2` row 수/`is_current` 유효성(동일 domain+metric당 1건) 검증
+- [ ] Pipeline B 동일 `run_id` 재실행 검증 계획 수립(`exception_ledger` 6-key 기준)
 - [ ] 모니터링 범위 확인(`v1 Core 4` 활성, table-based alert 비활성)
 
 ## 3. Execution Checklist
@@ -42,6 +43,7 @@ Reference: `.specs/cloud/cloud_migration_rebuild_plan.md`
 | Pipeline A | `silver.dq_status` 생성, CRITICAL 급증 없음 |  |  |
 | Pipeline B/C | Gold 핵심 테이블 생성 완료 |  |  |
 | Rule SSOT | `gold.dim_rule_scd2` 존재 + current rule 유효성 통과 |  |  |
+| Pipeline B Rerun | 동일 `run_id` 재실행 성공 + `exception_ledger` 6-key 중복 0건 |  |  |
 | Incremental | `T_cutover_utc` 이후 누락/중복 없음 |  |  |
 | State | `gold.pipeline_state.last_run_id` 최신 반영 |  |  |
 | Monitoring | `v1 Core 4` 경보 규칙 활성 + table-based alert 비활성 확인 |  |  |

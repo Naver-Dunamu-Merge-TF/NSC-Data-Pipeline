@@ -257,6 +257,7 @@ Planned:
 - D-019: salt 해석 우선순위
 - D-020: `pipeline_state` 성공/실패 갱신 규칙
 - D-033: `silver.bad_records` 영속화 방식
+- D-040: `gold.exception_ledger` MERGE key 확장 + 동일 `run_id` 재실행 수렴 기준
 
 ---
 
@@ -276,7 +277,8 @@ Planned:
 
 - B/C는 key/partition 전략 기준으로 재실행 수렴을 목표로 한다.
 - A의 `dq_status`/`exception_ledger`는 append이므로 동일 윈도우 재실행 시 행이 누적될 수 있다.
-- `gold.exception_ledger` MERGE key에는 `run_id`가 포함되어 run별 감사 이력이 보존된다.
+- `gold.exception_ledger`(Pipeline B) MERGE key는 `(date_kst, domain, exception_type, run_id, metric, message)`다.
+- Pipeline B는 동일 `run_id` 재실행을 허용하며, 동일 입력 기준으로 `exception_ledger`를 포함한 산출물 수렴을 보장한다.
 
 ### 6.3 `pipeline_state` 갱신 규칙
 

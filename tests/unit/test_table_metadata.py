@@ -38,13 +38,24 @@ def test_gold_merge_keys_and_partitions() -> None:
         "date_kst",
         "user_id",
     )
+    assert GOLD_MERGE_KEYS["gold.exception_ledger"] == (
+        "date_kst",
+        "domain",
+        "exception_type",
+        "run_id",
+        "metric",
+        "message",
+    )
     assert GOLD_MERGE_KEYS["gold.pipeline_state"] == ("pipeline_name",)
+    assert GOLD_MERGE_KEYS["gold.dim_rule_scd2"] == ("rule_id",)
     assert GOLD_MERGE_KEYS["gold.fact_payment_anonymized"] == ()
     assert GOLD_PARTITION_COLUMNS["gold.fact_payment_anonymized"] == ("date_kst",)
     assert GOLD_PARTITION_COLUMNS["gold.pipeline_state"] == ()
+    assert GOLD_PARTITION_COLUMNS["gold.dim_rule_scd2"] == ()
     assert GOLD_PARTITION_COLUMNS["gold.admin_tx_search"] == ("event_date_kst",)
 
 
 def test_gold_write_strategy() -> None:
     assert GOLD_WRITE_STRATEGY["gold.recon_daily_snapshot_flow"] == "merge"
+    assert GOLD_WRITE_STRATEGY["gold.dim_rule_scd2"] == "merge"
     assert GOLD_WRITE_STRATEGY["gold.fact_payment_anonymized"] == "overwrite_partitions"

@@ -345,3 +345,26 @@
 - 근거:
   - 코드: `configs/common.yaml`, `configs/dev.yaml`, `configs/prod.yaml`, `scripts/phase7/setup_minimal_cloud.sh`
   - 문서: `.specs/cloud/cloud_migration_rebuild_plan.md`
+
+### D-040 `gold.exception_ledger` 멱등성 충돌(재실행 시 MERGE 실패)
+- 상태: **결정됨(2026-02-11)**
+- 배경:
+  - D-036 L3 재검증 중 Pipeline B 재실행에서 `pipeline_b_recon`이 실패했다.
+  - 오류: `DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE` (SQLSTATE 21506)
+  - 기존 `gold.exception_ledger` MERGE 키 `(date_kst, domain, exception_type, run_id)`는 동일 run 내 다건 예외를 구분하지 못했다.
+- 영향:
+  - 같은 입력/같은 `run_id` 재실행 시 Pipeline B 멱등성 검증이 실패한다.
+  - L3 acceptance를 통과할 수 없어 D-036 운영 전환 검증이 블로킹된다.
+- 결정:
+  1) 예외 적재 단위는 행 단위를 유지한다(집계 전환하지 않음).
+  2) `gold.exception_ledger` MERGE 키를 `(date_kst, domain, exception_type, run_id, metric, message)`로 확장한다.
+  3) 동일 `run_id` 재실행을 허용하고, 동일 입력 기준 결과 수렴을 L3 idempotency 기준으로 고정한다.
+- 변경 유형:
+  - Major(키 변경): `.specs/schema/schema_migration_policy.md`의 변경 분류 기준을 따른다.
+- 재검토 트리거:
+  - `message` 직렬화 규칙이 바뀌어 key 안정성이 깨지거나, 동일 6-key 중복 source가 반복 관측되면 별도 stable key 컬럼 도입을 재검토한다.
+- 근거:
+  - 로그: `.agents/logs/verification/2026-02-11_d036_l3_timeout_and_failure.md`
+  - 로그: `.agents/logs/verification/L3_d036_resume_20260211T104159Z.log`
+  - 코드: `src/common/table_metadata.py`, `scripts/run_pipeline_b.py`, `src/transforms/ledger_controls.py`, `src/transforms/dq_guardrail.py`
+  - 테스트: `tests/unit/test_table_metadata.py`, `tests/integration/test_backfill_idempotency.py`

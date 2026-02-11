@@ -165,7 +165,8 @@ databricks bundle run pipeline_b_controls -t dev \
 
 주의:
 - Gold 주요 산출물은 merge 기반으로 수렴한다.
-- `gold.exception_ledger` merge key에는 `run_id`가 포함되므로, 다른 `run_id` 재실행은 감사 이력 증가로 해석한다.
+- `gold.exception_ledger`(Pipeline B) merge key는 `(date_kst, domain, exception_type, run_id, metric, message)`다.
+- 동일 `run_id` 재실행을 허용하며, 같은 입력 기준으로 결과가 수렴해야 한다.
 
 ### 6.3 Pipeline C 실패
 
@@ -189,12 +190,21 @@ databricks bundle run pipeline_c_analytics -t dev \
 | Pipeline | Write Strategy | Re-run Guidance |
 |---|---|---|
 | A | append (`silver.dq_status`, `gold.exception_ledger`) + `pipeline_state` merge | 동일 윈도우 반복 시 중복 가능. 운영 재실행은 목적(runbook 대응/재처리)과 `run_id`를 증적에 명시 |
-| B | Gold merge + `pipeline_state` merge | 동일 key 재실행 시 수렴. 단, `exception_ledger`는 `run_id`가 key에 포함되어 감사 이력 보존 |
+| B | Gold merge + `pipeline_state` merge | 동일 key 재실행 시 수렴. `exception_ledger`는 `(date_kst, domain, exception_type, run_id, metric, message)` 기준으로 동일 `run_id` 재실행도 수렴 |
 | C | `gold.fact_payment_anonymized` partition overwrite + `pipeline_state` merge | 대상 `date_kst` 파티션만 교체. 재실행 시 백필 범위를 최소화 |
 
 권장:
 - 장애 복구 rerun은 가급적 `backfill` + 명시적 `date_kst_start/end` 사용
 - 동일 장애 건의 반복 시 `run_id` 네이밍 규칙 고정(예: `rerun_<pipeline>_<yyyymmddhhmm>`)
+
+Pipeline B `exception_ledger` 중복 점검 SQL:
+```sql
+SELECT
+  date_kst, domain, exception_type, run_id, metric, message, COUNT(*) AS dup_cnt
+FROM ${catalog}.gold.exception_ledger
+GROUP BY date_kst, domain, exception_type, run_id, metric, message
+HAVING COUNT(*) > 1;
+```
 
 ### 7.1 `silver.bad_records` 보존/정리
 
