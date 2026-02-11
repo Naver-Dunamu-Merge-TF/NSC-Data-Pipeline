@@ -313,6 +313,7 @@ FR-ANA-02(P3). 외부 API(업비트 등) → Bronze 적재 → Gold 집계.
 - `gold.exception_ledger`에 `severity = CRITICAL` 기록 시 알림 트리거
 - 채널: Slack/Email (환경 설정으로 관리)
 - 알림 억제: Pipeline A가 `SOURCE_STALE` 감지 시 Pipeline B/C 알림 억제 (게이팅)
+- 운영 구현 기준: Azure Monitor + Log Analytics (상세: `.specs/ops/azure_monitoring_integration_plan.md`)
 
 ---
 
@@ -662,6 +663,7 @@ dev_catalog/
 - [ ] Asset Bundles 또는 Repos 설정
 - [ ] Workflow 정의 및 테스트 실행
 - [ ] 알림 채널 연동 (Slack/Email)
+- [ ] Azure Monitor 통합 기준선 적용 (진단 로그 연계, Core 4 알림, 통합 대시보드 v1)
 - [ ] 운영팀 리뷰 및 승인
 
 ### 12.5 환경별 설정 관리
