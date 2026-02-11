@@ -47,3 +47,11 @@ def test_silver_bad_records_contract_exists() -> None:
         "run_id",
         "detected_at",
     }
+
+
+def test_dim_rule_scd2_contract_exists() -> None:
+    contract = get_contract("gold.dim_rule_scd2")
+    cast_map = contract.cast_map
+    assert cast_map["rule_id"] == "string"
+    assert cast_map["effective_start_ts"] == "timestamp"
+    assert cast_map["is_current"] == "boolean"

@@ -149,13 +149,24 @@ def _align_to_contract(df, contract):
 
 def _contract_schema(contract):
     """Build a Spark StructType from a TableContract."""
-    from pyspark.sql.types import StructType
+    from pyspark.sql.types import ArrayType, DoubleType, MapType, StringType, StructType
 
     # PySpark StructType.add() expects 'long'/'integer' not SQL DDL 'bigint'/'int'
     _type_map = {"bigint": "long", "int": "integer"}
+
+    def _resolve_type(data_type: str):
+        normalized = data_type.strip().lower()
+        if normalized in _type_map:
+            return _type_map[normalized]
+        if normalized == "map<string,double>":
+            return MapType(StringType(), DoubleType(), valueContainsNull=True)
+        if normalized == "array<string>":
+            return ArrayType(StringType(), containsNull=True)
+        return data_type
+
     schema = StructType()
     for col in contract.columns:
-        spark_type = _type_map.get(col.data_type, col.data_type)
+        spark_type = _resolve_type(col.data_type)
         schema.add(col.name, spark_type, nullable=True)
     return schema
 
@@ -270,11 +281,34 @@ def _drop_known_tables(spark, catalog: str) -> None:
             "fact_payment_anonymized",
             "exception_ledger",
             "pipeline_state",
+            "dim_rule_scd2",
         ),
     }
     for schema, table_names in tables_by_schema.items():
         for table_name in table_names:
             spark.sql(f"DROP TABLE IF EXISTS {catalog}.{schema}.{table_name}")
+
+
+def _write_dim_rule_table(spark, *, catalog: str, rules) -> None:
+    from src.common.contracts import get_contract, validate_required_columns
+    from src.io.gold_io import write_gold_delta
+
+    rows = [rule.as_storage_dict() for rule in rules]
+    if not rows:
+        raise ValueError("Cannot sync empty rule set into gold.dim_rule_scd2")
+
+    contract = get_contract("gold.dim_rule_scd2")
+    validate_required_columns(rows[0].keys(), contract)
+    df = _align_to_contract(
+        spark.createDataFrame(rows, schema=_contract_schema(contract)),
+        contract,
+    )
+    write_gold_delta(
+        df,
+        f"{catalog}.gold.dim_rule_scd2",
+        table_name="gold.dim_rule_scd2",
+        mode="overwrite",
+    )
 
 
 def main() -> None:
@@ -292,7 +326,7 @@ def main() -> None:
         default_batch_id,
         prepare_bronze_records,
     )
-    from src.io.rule_loader import load_rule_seed
+    from src.io.rule_loader import load_rule_seed, load_runtime_rules
     from src.transforms import analytics, silver_controls
 
     spark = SparkSession.builder.getOrCreate()
@@ -378,7 +412,25 @@ def main() -> None:
         _set_status("bronze_written", table=table_fqn)
 
     rules_path = mock_root / "fixtures" / "dim_rule_scd2.json"
-    rules = load_rule_seed(rules_path)
+    seed_rules = load_rule_seed(rules_path)
+    _set_status(
+        "sync_rule_table_begin",
+        table=f"{catalog}.gold.dim_rule_scd2",
+        rows=len(seed_rules),
+    )
+    _write_dim_rule_table(spark, catalog=catalog, rules=seed_rules)
+    _set_status(
+        "sync_rule_table_done",
+        table=f"{catalog}.gold.dim_rule_scd2",
+        rows=len(seed_rules),
+    )
+    rules = load_runtime_rules(
+        spark,
+        catalog=catalog,
+        mode="strict",
+        seed_path=rules_path,
+        table_name="gold.dim_rule_scd2",
+    )
     _set_status("materialize_silver_begin", run_id=run_id)
 
     wallet_raw = _collect_table(spark, f"{catalog}.bronze.user_wallets_raw")

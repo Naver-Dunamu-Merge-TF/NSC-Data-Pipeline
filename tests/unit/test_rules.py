@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -79,3 +79,25 @@ def test_select_rule_prefers_current() -> None:
         [rule_old, rule_new], domain="silver", metric="bad_records_rate"
     )
     assert selected is rule_new
+
+
+def test_rule_as_storage_dict_keeps_typed_timestamps() -> None:
+    rule = RuleDefinition.from_dict(
+        {
+            "rule_id": "rule_storage",
+            "domain": "dq",
+            "metric": "freshness_sec",
+            "threshold": 300,
+            "severity_map": {"warn": 300, "crit": 600},
+            "effective_start_ts": "2026-02-01T00:00:00Z",
+            "effective_end_ts": "2026-02-02T00:00:00Z",
+            "is_current": False,
+        }
+    )
+    payload = rule.as_storage_dict()
+    assert isinstance(payload["effective_start_ts"], datetime)
+    assert isinstance(payload["effective_end_ts"], datetime)
+    assert payload["effective_start_ts"].tzinfo == timezone.utc
+    assert isinstance(payload["threshold"], float)
+    assert payload["threshold"] == 300.0
+    assert payload["severity_map"] == {"warn": 300.0, "crit": 600.0}

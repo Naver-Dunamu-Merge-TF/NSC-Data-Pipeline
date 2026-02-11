@@ -120,6 +120,14 @@ def test_dq_status_partition_in_specs() -> None:
     assert dq_specs[0].table_fqn == "cat.silver.dq_status"
 
 
+def test_dim_rule_table_in_specs() -> None:
+    specs = resolve_all_table_specs("cat")
+    dim_rule_specs = [s for s in specs if s.contract_key == "gold.dim_rule_scd2"]
+    assert len(dim_rule_specs) == 1
+    assert dim_rule_specs[0].partition_columns == ()
+    assert dim_rule_specs[0].table_fqn == "cat.gold.dim_rule_scd2"
+
+
 # ── dry-run path (spark=None) ───────────────────────────────────────────
 
 

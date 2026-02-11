@@ -6,17 +6,29 @@ variables:
     description: Unity Catalog name
   cluster_policy_id:
     description: Cluster policy id
+  rule_load_mode:
+    description: Runtime rule load mode for Pipeline A/B (strict|fallback)
+  rule_table:
+    description: Runtime rule table name for Pipeline A/B
+  rule_seed_path:
+    description: Fallback seed path for Pipeline A/B
 targets:
   dev:
     default: true
     variables:
       catalog: hive_metastore
       cluster_policy_id: "000C31E193543DF5"
+      rule_load_mode: fallback
+      rule_table: gold.dim_rule_scd2
+      rule_seed_path: mock_data/fixtures/dim_rule_scd2.json
 
   prod:
     variables:
       catalog: prod_catalog
       cluster_policy_id: "<prod-cluster-policy-id>"
+      rule_load_mode: strict
+      rule_table: gold.dim_rule_scd2
+      rule_seed_path: mock_data/fixtures/dim_rule_scd2.json
 
 resources:
   jobs:
@@ -43,6 +55,12 @@ resources:
           default: ""
         - name: run_id
           default: ""
+        - name: rule_load_mode
+          default: ${var.rule_load_mode}
+        - name: rule_table
+          default: ${var.rule_table}
+        - name: rule_seed_path
+          default: ${var.rule_seed_path}
       job_clusters:
         - job_cluster_key: policy_single_node
           new_cluster:
@@ -75,6 +93,12 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--rule-load-mode"
+              - "{{job.parameters.rule_load_mode}}"
+              - "--rule-table"
+              - "{{job.parameters.rule_table}}"
+              - "--rule-seed-path"
+              - "{{job.parameters.rule_seed_path}}"
 
     pipeline_b_controls:
       name: data-pipeline-b-${bundle.target}
@@ -99,6 +123,12 @@ resources:
           default: ""
         - name: run_id
           default: ""
+        - name: rule_load_mode
+          default: ${var.rule_load_mode}
+        - name: rule_table
+          default: ${var.rule_table}
+        - name: rule_seed_path
+          default: ${var.rule_seed_path}
       job_clusters:
         - job_cluster_key: policy_single_node
           new_cluster:
@@ -133,6 +163,12 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--rule-load-mode"
+              - "{{job.parameters.rule_load_mode}}"
+              - "--rule-table"
+              - "{{job.parameters.rule_table}}"
+              - "--rule-seed-path"
+              - "{{job.parameters.rule_seed_path}}"
         - task_key: pipeline_b_supply_ops
           retry_on_timeout: true
           max_retries: 2
@@ -157,6 +193,12 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--rule-load-mode"
+              - "{{job.parameters.rule_load_mode}}"
+              - "--rule-table"
+              - "{{job.parameters.rule_table}}"
+              - "--rule-seed-path"
+              - "{{job.parameters.rule_seed_path}}"
         - task_key: pipeline_b_finalize_success
           retry_on_timeout: true
           max_retries: 2
@@ -184,6 +226,12 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--rule-load-mode"
+              - "{{job.parameters.rule_load_mode}}"
+              - "--rule-table"
+              - "{{job.parameters.rule_table}}"
+              - "--rule-seed-path"
+              - "{{job.parameters.rule_seed_path}}"
         - task_key: pipeline_b_finalize_failure
           retry_on_timeout: true
           max_retries: 2
@@ -212,6 +260,12 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--rule-load-mode"
+              - "{{job.parameters.rule_load_mode}}"
+              - "--rule-table"
+              - "{{job.parameters.rule_table}}"
+              - "--rule-seed-path"
+              - "{{job.parameters.rule_seed_path}}"
 
     pipeline_c_analytics:
       name: data-pipeline-c-${bundle.target}
@@ -350,6 +404,37 @@ resources:
               - "--catalog"
               - "${var.catalog}"
 
+    sync_dim_rule_scd2:
+      name: data-pipeline-sync-rules-${bundle.target}
+      max_concurrent_runs: 1
+      timeout_seconds: 600
+      parameters:
+        - name: seed_path
+          default: "mock_data/fixtures/dim_rule_scd2.json"
+        - name: table_name
+          default: "gold.dim_rule_scd2"
+      job_clusters:
+        - job_cluster_key: policy_single_node
+          new_cluster:
+            spark_version: "16.4.x-scala2.12"
+            autoscale:
+              min_workers: 1
+              max_workers: 2
+            node_type_id: Standard_DS3_v2
+            policy_id: ${var.cluster_policy_id}
+      tasks:
+        - task_key: sync_rule_table
+          job_cluster_key: policy_single_node
+          spark_python_task:
+            python_file: scripts/sync_dim_rule_scd2.py
+            parameters:
+              - "--catalog"
+              - "${var.catalog}"
+              - "--seed-path"
+              - "{{job.parameters.seed_path}}"
+              - "--table-name"
+              - "{{job.parameters.table_name}}"
+
     e2e_full_pipeline:
       name: data-pipeline-e2e-full-${bundle.target}
       max_concurrent_runs: 1
@@ -367,6 +452,12 @@ resources:
           default: ""
         - name: run_id
           default: ""
+        - name: rule_load_mode
+          default: ${var.rule_load_mode}
+        - name: rule_table
+          default: ${var.rule_table}
+        - name: rule_seed_path
+          default: ${var.rule_seed_path}
       job_clusters:
         - job_cluster_key: policy_single_node
           new_cluster:
@@ -396,6 +487,12 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--rule-load-mode"
+              - "{{job.parameters.rule_load_mode}}"
+              - "--rule-table"
+              - "{{job.parameters.rule_table}}"
+              - "--rule-seed-path"
+              - "{{job.parameters.rule_seed_path}}"
         - task_key: pipeline_b
           depends_on:
             - task_key: pipeline_a
@@ -417,6 +514,12 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--rule-load-mode"
+              - "{{job.parameters.rule_load_mode}}"
+              - "--rule-table"
+              - "{{job.parameters.rule_table}}"
+              - "--rule-seed-path"
+              - "{{job.parameters.rule_seed_path}}"
         - task_key: pipeline_c
           depends_on:
             - task_key: pipeline_a

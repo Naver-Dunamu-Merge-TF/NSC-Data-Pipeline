@@ -46,6 +46,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--date-kst-end")
     parser.add_argument("--run-id")
     parser.add_argument(
+        "--rule-load-mode",
+        default="fallback",
+        choices=("strict", "fallback"),
+        help="Rule load mode: strict(table only) or fallback(table->seed).",
+    )
+    parser.add_argument(
+        "--rule-table",
+        default="gold.dim_rule_scd2",
+        help="Rule table name (gold.dim_rule_scd2 or fully-qualified catalog.schema.table).",
+    )
+    parser.add_argument(
+        "--rule-seed-path",
+        default="mock_data/fixtures/dim_rule_scd2.json",
+        help="Fallback rule seed path.",
+    )
+    parser.add_argument(
         "--repo-root",
         default=str(_default_repo_root()),
     )
@@ -89,6 +105,13 @@ def _load_current_state(spark, table_fqn: str, pipeline_name: str):
     return parse_pipeline_state_record(rows[0].asDict(recursive=True))
 
 
+def _resolve_seed_path(repo_root: Path, seed_path: str) -> Path:
+    path = Path(seed_path)
+    if path.is_absolute():
+        return path
+    return repo_root / path
+
+
 def main() -> None:
     args = parse_args()
     repo_root = Path(args.repo_root)
@@ -105,7 +128,7 @@ def main() -> None:
         serialize_zero_window_counts,
         write_pipeline_state_delta,
     )
-    from src.io.rule_loader import load_rule_seed
+    from src.io.rule_loader import load_runtime_rules
     from src.transforms.dq_guardrail import DQTableConfig, build_dq_status
 
     spark = SparkSession.builder.getOrCreate()
@@ -121,8 +144,13 @@ def main() -> None:
         pipeline_name="pipeline_a",
     )
 
-    rules_path = repo_root / "mock_data" / "fixtures" / "dim_rule_scd2.json"
-    rules = load_rule_seed(rules_path)
+    rules = load_runtime_rules(
+        spark,
+        catalog=args.catalog,
+        mode=args.rule_load_mode,
+        seed_path=_resolve_seed_path(repo_root, args.rule_seed_path),
+        table_name=args.rule_table,
+    )
 
     catalog = args.catalog
     bronze_schema = f"{catalog}.bronze"

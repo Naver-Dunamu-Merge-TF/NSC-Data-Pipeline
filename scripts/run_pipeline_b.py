@@ -68,6 +68,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--date-kst-end")
     parser.add_argument("--run-id")
     parser.add_argument(
+        "--rule-load-mode",
+        default="fallback",
+        choices=("strict", "fallback"),
+        help="Rule load mode: strict(table only) or fallback(table->seed).",
+    )
+    parser.add_argument(
+        "--rule-table",
+        default="gold.dim_rule_scd2",
+        help="Rule table name (gold.dim_rule_scd2 or fully-qualified catalog.schema.table).",
+    )
+    parser.add_argument(
+        "--rule-seed-path",
+        default="mock_data/fixtures/dim_rule_scd2.json",
+        help="Fallback rule seed path.",
+    )
+    parser.add_argument(
         "--repo-root",
         default=str(_default_repo_root()),
     )
@@ -246,6 +262,13 @@ def _resolve_run_id(*, pipeline_name: str, args: argparse.Namespace) -> str:
     return f"{pipeline_name}_{digest}"
 
 
+def _resolve_seed_path(repo_root: Path, seed_path: str) -> Path:
+    path = Path(seed_path)
+    if path.is_absolute():
+        return path
+    return repo_root / path
+
+
 def main() -> None:
     args = parse_args()
     repo_root = Path(args.repo_root)
@@ -254,7 +277,7 @@ def main() -> None:
 
     from src.common.job_params import JobParams
     from src.io.pipeline_state_io import STATE_FAILURE, STATE_SUCCESS
-    from src.io.rule_loader import load_rule_seed
+    from src.io.rule_loader import load_runtime_rules
     from src.transforms.ledger_controls import (
         build_admin_tx_search,
         build_ops_ledger_pairing_quality_daily,
@@ -305,8 +328,13 @@ def main() -> None:
         )
         return
 
-    rules_path = repo_root / "mock_data" / "fixtures" / "dim_rule_scd2.json"
-    rules = load_rule_seed(rules_path)
+    rules = load_runtime_rules(
+        spark,
+        catalog=args.catalog,
+        mode=args.rule_load_mode,
+        seed_path=_resolve_seed_path(repo_root, args.rule_seed_path),
+        table_name=args.rule_table,
+    )
     target_dates = params.target_dates()
     if not target_dates:
         raise ValueError("No target dates resolved for pipeline_b run")

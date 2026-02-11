@@ -360,6 +360,22 @@ GOLD_CONTRACTS: dict[str, TableContract] = {
         ),
         description="Pipeline execution state store.",
     ),
+    "gold.dim_rule_scd2": TableContract(
+        name="gold.dim_rule_scd2",
+        columns=(
+            ContractColumn("rule_id", "string", True),
+            ContractColumn("domain", "string", True),
+            ContractColumn("metric", "string", True),
+            ContractColumn("threshold", "double", False),
+            ContractColumn("severity_map", "map<string,double>", False),
+            ContractColumn("allowed_values", "array<string>", False),
+            ContractColumn("comment", "string", False),
+            ContractColumn("effective_start_ts", "timestamp", True),
+            ContractColumn("effective_end_ts", "timestamp", False),
+            ContractColumn("is_current", "boolean", True),
+        ),
+        description="SCD2 rule definitions for runtime thresholds and allowlists.",
+    ),
 }
 
 CONTRACTS: dict[str, TableContract] = {

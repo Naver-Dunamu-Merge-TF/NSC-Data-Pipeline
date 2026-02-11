@@ -73,6 +73,32 @@ class RuleDefinition:
             "is_current": self.is_current,
         }
 
+    def as_storage_dict(self) -> dict[str, Any]:
+        """Return Spark/Delta write-friendly payload with typed timestamps."""
+        threshold = float(self.threshold) if self.threshold is not None else None
+        severity_map = (
+            {
+                str(key): (float(value) if value is not None else None)
+                for key, value in self.severity_map.items()
+            }
+            if self.severity_map is not None
+            else None
+        )
+        return {
+            "rule_id": self.rule_id,
+            "domain": self.domain,
+            "metric": self.metric,
+            "threshold": threshold,
+            "severity_map": severity_map,
+            "allowed_values": list(self.allowed_values)
+            if self.allowed_values
+            else None,
+            "comment": self.comment,
+            "effective_start_ts": self.effective_start_ts,
+            "effective_end_ts": self.effective_end_ts,
+            "is_current": self.is_current,
+        }
+
 
 def _parse_datetime(value: Any) -> datetime | None:
     if value is None:
