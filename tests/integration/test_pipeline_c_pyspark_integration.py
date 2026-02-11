@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import hashlib
+import shutil
 from datetime import date
 
 import pytest
 
 pyspark = pytest.importorskip("pyspark")
+
+# PySpark requires a JVM. Keep this test opt-in for local development
+# environments that have both pyspark and Java installed.
+if shutil.which("java") is None:
+    pytest.skip("Java is required to run local PySpark tests (install OpenJDK).")
 from pyspark.sql import SparkSession
 
 from src.jobs.pipeline_c import build_pipeline_c_fact_rows

@@ -67,6 +67,20 @@ python -m pytest tests/unit/ tests/integration/ -v --cov=src --cov-fail-under=80
 
 `pytest-cov`는 커버리지 옵션(`--cov`, `--cov-fail-under`)에 필요합니다.
 
+### (선택) 로컬 PySpark 통합 테스트
+
+Databricks 런타임에서는 PySpark가 기본 제공되지만, 로컬에서 `tests/integration/`의 PySpark 스모크 테스트를
+실행하려면 Java(JVM)와 PySpark를 설치해야 합니다.
+
+Ubuntu/WSL 예시:
+
+```
+sudo apt-get update
+sudo apt-get install -y openjdk-17-jre-headless
+python -m pip install -r requirements-dev.txt -r requirements-spark.txt
+python -m pytest tests/integration/ -v
+```
+
 ### 로컬 Mock 데이터 확인
 
 - 로컬 Bronze mock 데이터는 `mock_data/bronze/*`에 저장됩니다.

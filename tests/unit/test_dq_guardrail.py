@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from src.common.rules import RuleDefinition
+from conftest import make_rule
+
 from src.transforms.dq_guardrail import (
     SEVERITY_CRITICAL,
     SEVERITY_WARN,
@@ -15,13 +16,9 @@ from src.transforms.dq_guardrail import (
 )
 
 
-def _rule(payload: dict) -> RuleDefinition:
-    return RuleDefinition.from_dict(payload)
-
-
 def test_build_dq_status_completeness_critical() -> None:
     rules = [
-        _rule(
+        make_rule(
             {
                 "rule_id": "dq_completeness_zero_windows_v1",
                 "domain": "dq",
@@ -53,7 +50,7 @@ def test_build_dq_status_completeness_critical() -> None:
 
 def test_build_dq_status_duplicate_and_contract() -> None:
     rules = [
-        _rule(
+        make_rule(
             {
                 "rule_id": "dq_dup_txid_default",
                 "domain": "dq",
@@ -61,7 +58,7 @@ def test_build_dq_status_duplicate_and_contract() -> None:
                 "severity_map": {"warn": 0.001, "crit": 0.01},
             }
         ),
-        _rule(
+        make_rule(
             {
                 "rule_id": "dq_contract_bad_records_default",
                 "domain": "dq",
@@ -69,7 +66,7 @@ def test_build_dq_status_duplicate_and_contract() -> None:
                 "severity_map": {"warn": 0.001, "crit": 0.01},
             }
         ),
-        _rule(
+        make_rule(
             {
                 "rule_id": "silver_entry_type_allowed_v1",
                 "domain": "silver",
@@ -123,7 +120,7 @@ def test_build_dq_status_duplicate_and_contract() -> None:
 
 def test_build_dq_status_freshness_warn() -> None:
     rules = [
-        _rule(
+        make_rule(
             {
                 "rule_id": "dq_freshness_default",
                 "domain": "dq",

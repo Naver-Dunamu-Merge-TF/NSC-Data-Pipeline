@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
+from conftest import merge_rows, normalize_run_id, sorted_rows
+
 from src.common.time_utils import UTC, date_kst
 from src.io.rule_loader import load_default_rule_seed
 from src.transforms.ledger_controls import (
@@ -11,26 +13,6 @@ from src.transforms.ledger_controls import (
     build_recon_snapshot_flow,
     build_supply_balance_daily,
 )
-
-
-def _merge_rows(rows, new_rows, keys):
-    index = {tuple(row[key] for key in keys): row for row in rows}
-    for row in new_rows:
-        index[tuple(row[key] for key in keys)] = row
-    return list(index.values())
-
-
-def _sorted(rows, keys):
-    return sorted(rows, key=lambda row: tuple(row[key] for key in keys))
-
-
-def _normalize_run_id(rows, run_id: str = "run"):
-    normalized = []
-    for row in rows:
-        payload = dict(row)
-        payload["run_id"] = run_id
-        normalized.append(payload)
-    return normalized
 
 
 def test_recon_supply_results_and_idempotency() -> None:
@@ -96,13 +78,11 @@ def test_recon_supply_results_and_idempotency() -> None:
     assert u1_row["drift_abs"] == Decimal("10")
     assert recon_output_1.exceptions[0]["exception_type"] == EXCEPTION_RECON
 
-    merged_once = _merge_rows([], recon_output_1.rows, ("date_kst", "user_id"))
-    merged_twice = _merge_rows(
-        merged_once, recon_output_2.rows, ("date_kst", "user_id")
-    )
-    assert _sorted(_normalize_run_id(merged_once), ("date_kst", "user_id")) == _sorted(
-        _normalize_run_id(merged_twice), ("date_kst", "user_id")
-    )
+    merged_once = merge_rows([], recon_output_1.rows, ("date_kst", "user_id"))
+    merged_twice = merge_rows(merged_once, recon_output_2.rows, ("date_kst", "user_id"))
+    assert sorted_rows(
+        normalize_run_id(merged_once), ("date_kst", "user_id")
+    ) == sorted_rows(normalize_run_id(merged_twice), ("date_kst", "user_id"))
 
     supply_output_1 = build_supply_balance_daily(
         wallet_snapshots,
@@ -123,10 +103,10 @@ def test_recon_supply_results_and_idempotency() -> None:
     assert supply_output_1.row["wallet_total_balance"] == Decimal("350")
     assert supply_output_1.exceptions[0]["exception_type"] == EXCEPTION_SUPPLY
 
-    merged_supply_once = _merge_rows([], [supply_output_1.row], ("date_kst",))
-    merged_supply_twice = _merge_rows(
+    merged_supply_once = merge_rows([], [supply_output_1.row], ("date_kst",))
+    merged_supply_twice = merge_rows(
         merged_supply_once, [supply_output_2.row], ("date_kst",)
     )
-    assert _sorted(_normalize_run_id(merged_supply_once), ("date_kst",)) == _sorted(
-        _normalize_run_id(merged_supply_twice), ("date_kst",)
-    )
+    assert sorted_rows(
+        normalize_run_id(merged_supply_once), ("date_kst",)
+    ) == sorted_rows(normalize_run_id(merged_supply_twice), ("date_kst",))

@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from src.common.rules import RuleDefinition
+from conftest import make_ledger_rule
+
 from src.common.time_utils import UTC, date_kst
 from src.transforms.ledger_controls import (
     EXCEPTION_RECON,
@@ -16,18 +17,6 @@ from src.transforms.ledger_controls import (
     build_recon_snapshot_flow,
     build_supply_balance_daily,
 )
-
-
-def _rule(metric: str) -> RuleDefinition:
-    return RuleDefinition.from_dict(
-        {
-            "rule_id": f"rule_{metric}",
-            "domain": "ledger",
-            "metric": metric,
-            "threshold": 0,
-            "severity_map": {"crit": 0},
-        }
-    )
 
 
 def test_build_recon_snapshot_flow_and_gating() -> None:
@@ -72,7 +61,7 @@ def test_build_recon_snapshot_flow_and_gating() -> None:
         ledger_entries,
         target_date=target_date,
         run_id="run-1",
-        rules=[_rule("drift_abs")],
+        rules=[make_ledger_rule("drift_abs")],
     )
 
     assert len(output.rows) == 2
@@ -85,7 +74,7 @@ def test_build_recon_snapshot_flow_and_gating() -> None:
         ledger_entries,
         target_date=target_date,
         run_id="run-1",
-        rules=[_rule("drift_abs")],
+        rules=[make_ledger_rule("drift_abs")],
         dq_tags=[TAG_SOURCE_STALE],
     )
     exception_gated = output_gated.exceptions[0]
@@ -124,7 +113,7 @@ def test_build_supply_balance_daily() -> None:
         ledger_entries,
         target_date=target_date,
         run_id="run-2",
-        rules=[_rule("supply_diff_abs")],
+        rules=[make_ledger_rule("supply_diff_abs")],
     )
 
     assert output.row["issued_supply"] == Decimal("290")
