@@ -1,56 +1,52 @@
 from __future__ import annotations
 
 import argparse
-import os
+import inspect
 import sys
 from pathlib import Path
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
+# Bootstrap: ensure repo root is on sys.path for src.* imports.
+_SCRIPT_PATH = (
+    globals().get("__file__") or inspect.getframeinfo(inspect.currentframe()).filename
+)
+_REPO_ROOT = Path(_SCRIPT_PATH).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-def _default_repo_root() -> Path:
-    """Best-effort repo root resolution for Databricks Jobs/Bundles."""
-    candidates: list[Path] = []
-
-    file_name = globals().get("__file__") or _default_repo_root.__code__.co_filename
-    if file_name:
-        candidates.append(Path(file_name))
-
-    if sys.argv and sys.argv[0]:
-        candidates.append(Path(sys.argv[0]))
-
-    candidates.append(Path.cwd())
-
-    env_root = os.environ.get("PIPELINE_ROOT")
-    if env_root:
-        candidates.append(Path(env_root))
-
-    for base in candidates:
-        for probe in (base, base.parent, *base.parents):
-            if (probe / "src").is_dir() and (probe / "mock_data").is_dir():
-                return probe
-
-    return Path(env_root or "/dbfs/tmp/data-pipeline")
+from src.common.config_loader import find_repo_root, get_config_value  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run Pipeline C (Analytics anonymized mart) in Databricks."
     )
-    parser.add_argument("--catalog", default="2dt_final_team4_databricks_test")
-    parser.add_argument("--run-mode", default="incremental")
+    parser.add_argument("--catalog", default=get_config_value("databricks.catalog"))
+    parser.add_argument("--run-mode", default="")
     parser.add_argument("--run-id")
     parser.add_argument("--start-ts")
     parser.add_argument("--end-ts")
     parser.add_argument("--date-kst-start")
     parser.add_argument("--date-kst-end")
     parser.add_argument("--salt")
-    parser.add_argument("--secret-scope", default="ledger-analytics-dev")
-    parser.add_argument("--secret-key", default="salt_user_key")
+    parser.add_argument(
+        "--secret-scope",
+        default=get_config_value("analytics.secret_scope"),
+    )
+    parser.add_argument(
+        "--secret-key",
+        default=get_config_value("analytics.secret_key"),
+    )
     parser.add_argument(
         "--repo-root",
-        default=str(_default_repo_root()),
+        default=str(find_repo_root()),
+    )
+    parser.add_argument(
+        "--skip-upstream-readiness-check",
+        action="store_true",
+        help="Skip fail-closed upstream readiness check for emergency/manual runs.",
     )
     return parser.parse_args()
 
@@ -100,6 +96,7 @@ def main() -> None:
 
     from src.common.contracts import get_contract
     from src.common.job_params import JobParams
+    from src.common.window_defaults import inject_default_daily_backfill
     from src.io.gold_io import write_gold_delta
     from src.io.pipeline_state_io import (
         STATE_FAILURE,
@@ -107,10 +104,11 @@ def main() -> None:
         apply_pipeline_state,
         write_pipeline_state_delta,
     )
+    from src.io.upstream_readiness import assert_pipeline_ready
     from src.jobs.pipeline_c import build_pipeline_c_fact_rows
 
     spark = SparkSession.builder.getOrCreate()
-    params = JobParams.from_mapping(
+    params_payload = inject_default_daily_backfill(
         {
             "run_mode": args.run_mode,
             "start_ts": args.start_ts,
@@ -118,6 +116,16 @@ def main() -> None:
             "date_kst_start": args.date_kst_start,
             "date_kst_end": args.date_kst_end,
             "run_id": args.run_id,
+        }
+    )
+    params = JobParams.from_mapping(
+        {
+            "run_mode": params_payload.get("run_mode"),
+            "start_ts": params_payload.get("start_ts"),
+            "end_ts": params_payload.get("end_ts"),
+            "date_kst_start": params_payload.get("date_kst_start"),
+            "date_kst_end": params_payload.get("date_kst_end"),
+            "run_id": params_payload.get("run_id"),
         },
         pipeline_name="pipeline_c",
     )
@@ -127,6 +135,14 @@ def main() -> None:
     pipeline_contract = get_contract("gold.pipeline_state")
 
     try:
+        if not args.skip_upstream_readiness_check:
+            assert_pipeline_ready(
+                spark,
+                catalog=args.catalog,
+                upstream_pipeline_name="pipeline_silver",
+                required_processed_end=params.processed_end_utc(),
+            )
+
         order_events_df = spark.table(f"{silver_schema}.order_events")
         if (
             params.start_ts

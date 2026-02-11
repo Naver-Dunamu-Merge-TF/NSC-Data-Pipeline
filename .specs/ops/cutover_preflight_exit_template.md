@@ -20,6 +20,7 @@ Reference: `.specs/cloud/cloud_migration_rebuild_plan.md`
 - [ ] 기존 Workflows 정지/재개 순서 확정
 - [ ] Bootstrap job(`bootstrap_catalog`) 배포 완료 확인
 - [ ] `sync_dim_rule_scd2` job 배포 + 실행 경로 확인
+- [ ] `pipeline_silver_materialization` job 배포 + 스케줄/의존성 확인
 - [ ] `gold.dim_rule_scd2` row 수/`is_current` 유효성(동일 domain+metric당 1건) 검증
 - [ ] Pipeline B 동일 `run_id` 재실행 검증 계획 수립(`exception_ledger` 6-key 기준)
 - [ ] 모니터링 범위 확인(`v1 Core 4` 활성, table-based alert 비활성)
@@ -30,6 +31,7 @@ Reference: `.specs/cloud/cloud_migration_rebuild_plan.md`
 - [ ] `bootstrap_catalog` 실행: 3 스키마 + 23 계약 테이블 생성 확인
 - [ ] `sync_dim_rule_scd2` 실행: `gold.dim_rule_scd2` 최신 seed 반영 확인
 - [ ] Pipeline A backfill 실행
+- [ ] Pipeline Silver backfill 실행
 - [ ] Pipeline B/C backfill 실행
 - [ ] `T_cutover_utc` 이후 incremental 전환
 - [ ] 기존 환경 Workflows 중지
@@ -41,6 +43,7 @@ Reference: `.specs/cloud/cloud_migration_rebuild_plan.md`
 |---|---|---|---|
 | Infra/UC | External Location 접근 성공 |  |  |
 | Pipeline A | `silver.dq_status` 생성, CRITICAL 급증 없음 |  |  |
+| Pipeline Silver | `silver.wallet_snapshot/ledger_entries/order_events/order_items/products` 생성 + `silver.bad_records` 적재/검증 완료 |  |  |
 | Pipeline B/C | Gold 핵심 테이블 생성 완료 |  |  |
 | Rule SSOT | `gold.dim_rule_scd2` 존재 + current rule 유효성 통과 |  |  |
 | Pipeline B Rerun | 동일 `run_id` 재실행 성공 + `exception_ledger` 6-key 중복 0건 |  |  |

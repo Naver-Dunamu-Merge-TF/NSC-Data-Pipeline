@@ -1,10 +1,11 @@
-# Operations Runbook (Pipeline A/B/C)
+# Operations Runbook (Pipeline A/Silver/B/C)
 
 Last updated: 2026-02-11
 
 ## 1. Scope
 
 - Pipeline A (Guardrail DQ)
+- Pipeline Silver (Bronze -> Silver materialization)
 - Pipeline B (Ledger/Admin controls)
 - Pipeline C (Analytics anonymized mart)
 - 공통 상태 테이블: `gold.pipeline_state`
@@ -23,15 +24,20 @@ Last updated: 2026-02-11
 | Pipeline | Schedule (KST) | Timeout | Retry |
 |---|---|---:|---|
 | A | 매 10분 (`0 0/10 * * * ?`) | 3600s | 2회, 5분 간격 |
-| B | 매일 00:05 (`0 5 0 * * ?`) | 3600s | 각 task별 2회, 5분 간격 |
-| C | 매일 00:20 (`0 20 0 * * ?`) | 3600s | 2회, 5분 간격 |
+| Silver | 매일 00:00 (`0 0 0 * * ?`) | 3600s | 2회, 5분 간격 |
+| B | 매일 00:20 (`0 20 0 * * ?`) | 3600s | 각 task별 2회, 5분 간격 |
+| C | 매일 00:35 (`0 35 0 * * ?`) | 3600s | 2회, 5분 간격 |
 
 공통 실행 파라미터:
 - `run_mode`: `incremental | backfill`
 - `start_ts`, `end_ts` (UTC window)
 - `date_kst_start`, `date_kst_end` (backfill day window)
 - `run_id`
-- `rule_load_mode` (A/B 전용): `strict | fallback`
+- `rule_load_mode` (A/B/Silver): `strict | fallback`
+
+운영 기본값(D-035):
+- B/C/Silver는 윈도우 파라미터가 비어 있으면 `전일(KST) 1일 backfill`로 자동 해석한다.
+- B/C는 `pipeline_silver`의 `last_processed_end`가 대상 윈도우를 충족하지 못하면 fail-closed로 즉시 실패한다.
 
 Pipeline B task 구성:
 - `pipeline_b_recon`
@@ -149,13 +155,31 @@ databricks bundle run pipeline_a_guardrail -t dev \
 - Pipeline A는 `silver.dq_status`, `gold.exception_ledger`를 append로 기록한다.
 - 동일 윈도우를 동일 `run_id`로 반복 실행하면 중복 행이 생길 수 있으므로 운영 재실행 시 `run_id` 전략을 명확히 남긴다.
 
-### 6.2 Pipeline B 실패
+### 6.2 Pipeline Silver 실패
 
 점검:
-1. `silver.wallet_snapshot`, `silver.ledger_entries` 대상 `date_kst` 데이터 존재 확인
-2. `gold.dim_rule_scd2`에서 `drift_abs`, `supply_diff_abs` 임계치/rule_id 확인
-3. 임계치 비교는 `value > threshold` 규칙(경계값 동일 시 경보 아님)으로 해석
-4. 실패 task가 `recon`인지 `supply_ops`인지 먼저 분리
+1. Bronze 입력 6종(`user_wallets_raw`, `transaction_ledger_raw`, `payment_orders_raw`, `orders_raw`, `order_items_raw`, `products_raw`) 대상 윈도우 데이터 존재 확인
+2. `silver.bad_records` row 증가 추이와 `wallet_snapshot`/`ledger_entries` bad rate 임계치 초과 여부 확인
+3. `gold.pipeline_state`의 `pipeline_silver` 상태(`last_success_ts`, `last_processed_end`, `last_run_id`) 확인
+
+재실행 예시:
+```bash
+databricks bundle run pipeline_silver_materialization -t dev \
+  --params run_mode=backfill,date_kst_start=2026-02-01,date_kst_end=2026-02-01,run_id=rerun_silver_20260211
+```
+
+주의:
+- `silver.bad_records`는 append-only다.
+- `wallet_snapshot`/`ledger_entries`는 fail-fast 초과여도 bad_records 선저장 이후 실패한다.
+
+### 6.3 Pipeline B 실패
+
+점검:
+1. `gold.pipeline_state`에서 `pipeline_silver.last_processed_end`가 대상 윈도우 이상인지 확인
+2. `silver.wallet_snapshot`, `silver.ledger_entries` 대상 `date_kst` 데이터 존재 확인
+3. `gold.dim_rule_scd2`에서 `drift_abs`, `supply_diff_abs` 임계치/rule_id 확인
+4. 임계치 비교는 `value > threshold` 규칙(경계값 동일 시 경보 아님)으로 해석
+5. 실패 task가 `recon`인지 `supply_ops`인지 먼저 분리
 
 재실행 예시:
 ```bash
@@ -168,12 +192,13 @@ databricks bundle run pipeline_b_controls -t dev \
 - `gold.exception_ledger`(Pipeline B) merge key는 `(date_kst, domain, exception_type, run_id, metric, message)`다.
 - 동일 `run_id` 재실행을 허용하며, 같은 입력 기준으로 결과가 수렴해야 한다.
 
-### 6.3 Pipeline C 실패
+### 6.4 Pipeline C 실패
 
 점검:
-1. Secret Scope/Key (`ledger-analytics-dev/salt_user_key`) 접근 여부 확인
-2. Databricks 런타임에서는 salt 해석 실패 시 fail-closed(로컬 더미 fallback 불가)
-3. `silver.order_events/order_items/products` 조인 키 및 대상 `event_date_kst` 데이터 확인
+1. `gold.pipeline_state`에서 `pipeline_silver.last_processed_end`가 대상 윈도우 이상인지 확인
+2. Secret Scope/Key (`ledger-analytics-dev/salt_user_key`) 접근 여부 확인
+3. Databricks 런타임에서는 salt 해석 실패 시 fail-closed(로컬 더미 fallback 불가)
+4. `silver.order_events/order_items/products` 조인 키 및 대상 `event_date_kst` 데이터 확인
 
 재실행 예시:
 ```bash
@@ -190,6 +215,7 @@ databricks bundle run pipeline_c_analytics -t dev \
 | Pipeline | Write Strategy | Re-run Guidance |
 |---|---|---|
 | A | append (`silver.dq_status`, `gold.exception_ledger`) + `pipeline_state` merge | 동일 윈도우 반복 시 중복 가능. 운영 재실행은 목적(runbook 대응/재처리)과 `run_id`를 증적에 명시 |
+| Silver | Silver MERGE + `silver.bad_records` append + `pipeline_state` merge | 동일 key 재실행 시 수렴. fail-fast 임계치 초과 시 `bad_records` 저장 후 실패 |
 | B | Gold merge + `pipeline_state` merge | 동일 key 재실행 시 수렴. `exception_ledger`는 `(date_kst, domain, exception_type, run_id, metric, message)` 기준으로 동일 `run_id` 재실행도 수렴 |
 | C | `gold.fact_payment_anonymized` partition overwrite + `pipeline_state` merge | 대상 `date_kst` 파티션만 교체. 재실행 시 백필 범위를 최소화 |
 

@@ -29,8 +29,13 @@ Last updated: 2026-02-11
   - `gold.exception_ledger`
   - `gold.pipeline_state`
 - `silver.bad_records` 영속화 구현 (현재 경로: E2E setup, 저장 후 fail-fast)
+- 운영 Silver 물질화 경로 구현 (`run_pipeline_silver`, `pipeline_silver_materialization`)
+  - B/C는 `pipeline_silver` 체크포인트 기반 fail-closed dependency 적용
+  - B/C/Silver는 빈 윈도우 파라미터 시 `전일(KST) 1일 backfill` 기본 해석
+  - `e2e_full_pipeline` 의존 그래프: `sync_dim_rule_scd2 -> pipeline_a -> pipeline_silver -> pipeline_b/pipeline_c`
 - `gold.dim_rule_scd2` 테이블 기반 룰 로딩 구현
-  - Pipeline A/B: `--rule-load-mode` 기반(`strict|fallback`)
+  - Pipeline A/B/Silver: `--rule-load-mode` 기반(`strict|fallback`)
+  - 룰 반영 경로: `sync_dim_rule_scd2` 전용 job
   - 운영 기본 정책: prod `strict`, dev/test `fallback`
 
 ### 0.2 Planned / Backlog (미구현 또는 확정 전)
@@ -111,7 +116,7 @@ Databricks는 결제/지갑 OLTP를 대체하는 시스템이 아니라, NSC 결
 - `silver.dq_status`
 
 주의:
-- `silver.bad_records`는 현재 E2E setup 경로에서 append-only로 적재되며, `wallet_snapshot`/`ledger_entries`는 격리 저장 후 fail-fast를 적용한다 (D-033).
+- `silver.bad_records`는 운영 `run_pipeline_silver` 경로에서 append-only로 적재되며, `wallet_snapshot`/`ledger_entries`는 격리 저장 후 fail-fast를 적용한다 (D-033, D-035).
 
 ### 2.4 Gold (Current)
 
@@ -133,8 +138,9 @@ Planned:
 | Pipeline | Schedule (KST) | Timeout | Retry |
 |---|---|---:|---|
 | A | `0 0/10 * * * ?` | 3600s | 2회, 5분 간격 |
-| B | `0 5 0 * * ?` | 3600s | task별 2회, 5분 간격 |
-| C | `0 20 0 * * ?` | 3600s | 2회, 5분 간격 |
+| Silver | `0 0 0 * * ?` | 3600s | 2회, 5분 간격 |
+| B | `0 20 0 * * ?` | 3600s | task별 2회, 5분 간격 |
+| C | `0 35 0 * * ?` | 3600s | 2회, 5분 간격 |
 
 근거: `databricks.yml`
 
@@ -156,6 +162,7 @@ Planned:
 
 - `incremental`: `start_ts/end_ts` 필수
 - `backfill`: `date_kst_start/end` 또는 `start_ts/end_ts`로 날짜 범위 해석 필수
+- 운영 기본값(D-035): B/C/Silver에서 윈도우 파라미터가 공백이면 `run_mode=backfill`, `date_kst_start=end=전일(KST)`로 자동 해석
 
 ---
 
@@ -244,9 +251,10 @@ Planned:
 ### 5.2 룰 로딩 소스 (Current)
 
 - 룰 SSOT: `gold.dim_rule_scd2`
-- Pipeline A/B 런타임:
+- Pipeline A/B/Silver 런타임:
   - `strict`: 테이블 로딩 실패 시 즉시 실패(fail-closed)
   - `fallback`: 테이블 우선, 실패 시 `mock_data/fixtures/dim_rule_scd2.json` fallback
+- 룰 반영/배포 경로: `sync_dim_rule_scd2` job로 `gold.dim_rule_scd2`를 갱신하고 런타임은 해당 테이블을 읽는다.
 - 기본 운영 정책:
   - prod: `strict`
   - dev/test: `fallback`
@@ -384,7 +392,7 @@ Planned:
 
 ## 12) 즉시 후속 정합화 항목
 
-1. `silver.bad_records` 운영 경로 정식화(`run_pipeline_silver` 또는 동등 경로) 여부 검토
+1. D-035 완료: `run_pipeline_silver` 운영 경로 + B/C fail-closed dependency 적용
 2. 룰 변경 거버넌스(runbook 절차) 운영 증적 축적 및 정기 점검
 3. `data_contract.md`와 `project_specs.md`의 Current/Planned 표기를 동일 기준으로 유지
 4. v2 모니터링 확장 준비(테이블 기반 알림: `dq_status`, `exception_ledger`, `pipeline_state`, stale/drop 억제)

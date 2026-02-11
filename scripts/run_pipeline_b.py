@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import os
 import sys
 from datetime import date, datetime
@@ -9,6 +10,16 @@ from pathlib import Path
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
+
+# Bootstrap: ensure repo root is on sys.path for src.* imports.
+_SCRIPT_PATH = (
+    globals().get("__file__") or inspect.getframeinfo(inspect.currentframe()).filename
+)
+_REPO_ROOT = Path(_SCRIPT_PATH).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from src.common.config_loader import find_repo_root, get_config_value  # noqa: E402
 
 TASK_ALL = "all"
 TASK_RECON = "recon"
@@ -25,43 +36,18 @@ VALID_TASKS = {
 }
 
 
-def _default_repo_root() -> Path:
-    """Best-effort repo root resolution for Databricks Jobs/Bundles."""
-    candidates: list[Path] = []
-
-    file_name = globals().get("__file__") or _default_repo_root.__code__.co_filename
-    if file_name:
-        candidates.append(Path(file_name))
-
-    if sys.argv and sys.argv[0]:
-        candidates.append(Path(sys.argv[0]))
-
-    candidates.append(Path.cwd())
-
-    env_root = os.environ.get("PIPELINE_ROOT")
-    if env_root:
-        candidates.append(Path(env_root))
-
-    for base in candidates:
-        for probe in (base, base.parent, *base.parents):
-            if (probe / "src").is_dir() and (probe / "mock_data").is_dir():
-                return probe
-
-    return Path(env_root or "/dbfs/tmp/data-pipeline")
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run Pipeline B (Ledger/Admin controls) in Databricks."
     )
-    parser.add_argument("--catalog", default="2dt_final_team4_databricks_test")
+    parser.add_argument("--catalog", default=get_config_value("databricks.catalog"))
     parser.add_argument(
         "--task",
         default=TASK_ALL,
         choices=sorted(VALID_TASKS),
         help="Select which Pipeline B task to run (useful for multi-task workflows).",
     )
-    parser.add_argument("--run-mode", default="incremental")
+    parser.add_argument("--run-mode", default="")
     parser.add_argument("--start-ts")
     parser.add_argument("--end-ts")
     parser.add_argument("--date-kst-start")
@@ -85,7 +71,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--repo-root",
-        default=str(_default_repo_root()),
+        default=str(find_repo_root()),
+    )
+    parser.add_argument(
+        "--skip-upstream-readiness-check",
+        action="store_true",
+        help="Skip fail-closed upstream readiness check for emergency/manual runs.",
     )
     return parser.parse_args()
 
@@ -276,8 +267,10 @@ def main() -> None:
         sys.path.insert(0, repo_root.as_posix())
 
     from src.common.job_params import JobParams
+    from src.common.window_defaults import inject_default_daily_backfill
     from src.io.pipeline_state_io import STATE_FAILURE, STATE_SUCCESS
     from src.io.rule_loader import load_runtime_rules
+    from src.io.upstream_readiness import assert_pipeline_ready
     from src.transforms.ledger_controls import (
         build_admin_tx_search,
         build_ops_ledger_pairing_quality_daily,
@@ -288,14 +281,29 @@ def main() -> None:
     )
 
     spark = SparkSession.builder.getOrCreate()
-    resolved_run_id = _resolve_run_id(pipeline_name="pipeline_b", args=args)
-    params = JobParams.from_mapping(
+    params_payload = inject_default_daily_backfill(
         {
             "run_mode": args.run_mode,
             "start_ts": args.start_ts,
             "end_ts": args.end_ts,
             "date_kst_start": args.date_kst_start,
             "date_kst_end": args.date_kst_end,
+            "run_id": args.run_id,
+        }
+    )
+    args.run_mode = params_payload.get("run_mode")
+    args.start_ts = params_payload.get("start_ts")
+    args.end_ts = params_payload.get("end_ts")
+    args.date_kst_start = params_payload.get("date_kst_start")
+    args.date_kst_end = params_payload.get("date_kst_end")
+    resolved_run_id = _resolve_run_id(pipeline_name="pipeline_b", args=args)
+    params = JobParams.from_mapping(
+        {
+            "run_mode": params_payload.get("run_mode"),
+            "start_ts": params_payload.get("start_ts"),
+            "end_ts": params_payload.get("end_ts"),
+            "date_kst_start": params_payload.get("date_kst_start"),
+            "date_kst_end": params_payload.get("date_kst_end"),
             "run_id": resolved_run_id,
         },
         pipeline_name="pipeline_b",
@@ -328,46 +336,54 @@ def main() -> None:
         )
         return
 
-    rules = load_runtime_rules(
-        spark,
-        catalog=args.catalog,
-        mode=args.rule_load_mode,
-        seed_path=_resolve_seed_path(repo_root, args.rule_seed_path),
-        table_name=args.rule_table,
-    )
-    target_dates = params.target_dates()
-    if not target_dates:
-        raise ValueError("No target dates resolved for pipeline_b run")
-
-    silver_schema = f"{args.catalog}.silver"
-    bronze_schema = f"{args.catalog}.bronze"
-
-    wallet_snapshots = [
-        row.asDict(recursive=True)
-        for row in spark.table(f"{silver_schema}.wallet_snapshot").collect()
-    ]
-    ledger_entries = [
-        row.asDict(recursive=True)
-        for row in spark.table(f"{silver_schema}.ledger_entries").collect()
-    ]
-    payment_orders: list[dict] = []
-    if task in {TASK_ALL, TASK_SUPPLY_OPS}:
-        payment_orders = [
-            row.asDict(recursive=True)
-            for row in spark.table(f"{bronze_schema}.payment_orders_raw").collect()
-        ]
-
-    dq_tags_by_date = _load_dq_tags_by_date(spark, f"{silver_schema}.dq_status")
-
-    recon_rows: list[dict] = []
-    supply_rows: list[dict] = []
-    ops_failure_rows: list[dict] = []
-    ops_refund_rows: list[dict] = []
-    pairing_rows: list[dict] = []
-    admin_rows: list[dict] = []
-    exception_rows: list[dict] = []
-
     try:
+        if not args.skip_upstream_readiness_check:
+            assert_pipeline_ready(
+                spark,
+                catalog=args.catalog,
+                upstream_pipeline_name="pipeline_silver",
+                required_processed_end=params.processed_end_utc(),
+            )
+
+        rules = load_runtime_rules(
+            spark,
+            catalog=args.catalog,
+            mode=args.rule_load_mode,
+            seed_path=_resolve_seed_path(repo_root, args.rule_seed_path),
+            table_name=args.rule_table,
+        )
+        target_dates = params.target_dates()
+        if not target_dates:
+            raise ValueError("No target dates resolved for pipeline_b run")
+
+        silver_schema = f"{args.catalog}.silver"
+        bronze_schema = f"{args.catalog}.bronze"
+
+        wallet_snapshots = [
+            row.asDict(recursive=True)
+            for row in spark.table(f"{silver_schema}.wallet_snapshot").collect()
+        ]
+        ledger_entries = [
+            row.asDict(recursive=True)
+            for row in spark.table(f"{silver_schema}.ledger_entries").collect()
+        ]
+        payment_orders: list[dict] = []
+        if task in {TASK_ALL, TASK_SUPPLY_OPS}:
+            payment_orders = [
+                row.asDict(recursive=True)
+                for row in spark.table(f"{bronze_schema}.payment_orders_raw").collect()
+            ]
+
+        dq_tags_by_date = _load_dq_tags_by_date(spark, f"{silver_schema}.dq_status")
+
+        recon_rows: list[dict] = []
+        supply_rows: list[dict] = []
+        ops_failure_rows: list[dict] = []
+        ops_refund_rows: list[dict] = []
+        pairing_rows: list[dict] = []
+        admin_rows: list[dict] = []
+        exception_rows: list[dict] = []
+
         for target_date in target_dates:
             dq_tags = dq_tags_by_date.get(target_date)
             if task in {TASK_ALL, TASK_RECON}:

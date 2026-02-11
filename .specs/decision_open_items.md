@@ -262,19 +262,30 @@
   - 문서: `.specs/ops/cutover_preflight_exit_template.md`
 
 ### D-035 Silver 운영 물질화 경로
-- 상태: **결정 필요(2026-02-11)**
+- 상태: **결정됨(2026-02-11)**
 - 배경:
   - Pipeline B/C는 `silver.*` 입력을 읽지만, 운영 `run_pipeline_*` 경로에는 Bronze->Silver 물질화 단계가 없다.
   - 현재 Silver 물질화는 E2E setup 경로(`scripts/e2e/setup_e2e_env.py`)에 사실상 집중되어 있다.
 - 영향:
   - 운영에서 Silver 갱신이 보장되지 않으면 B/C 산출물 stale 또는 미생성 리스크가 발생한다.
-- 결정 필요:
-  1) 전용 Silver job(`run_pipeline_silver`)을 도입할지
-  2) Pipeline A 또는 B/C 내부로 Silver 물질화를 포함할지
-  3) 스케줄/멱등성/실패 전파 기준(특히 B/C dependency)을 어떻게 고정할지
+- 결정:
+  1) 전용 Silver job(`run_pipeline_silver`, workflow: `pipeline_silver_materialization`)을 도입한다.
+  2) Pipeline B/C는 `pipeline_silver` 체크포인트(`gold.pipeline_state.last_processed_end`) 기준 fail-closed dependency를 적용한다.
+  3) 윈도우 파라미터가 비어 있으면 `전일(KST) 1일 backfill`을 기본값으로 자동 해석한다.
+  4) 운영 스케줄은 Silver 선행 버퍼를 고정한다.
+     - Silver: `00:00 KST`
+     - B: `00:20 KST`
+     - C: `00:35 KST`
+  5) `e2e_full_pipeline` task graph는 `sync_dim_rule_scd2 -> pipeline_a -> pipeline_silver -> pipeline_b/pipeline_c`로 고정한다.
+  6) Silver Bronze-window 필터는 `timestamp_fields` 중 존재하는 컬럼 전체를 OR로 평가한다(첫 컬럼 단독 선택 금지).
+  7) Pipeline B `--task all` 경로의 readiness 검증은 failure-state 기록 경계(try/except) 내부에서 수행해 실패 시 `gold.pipeline_state` 업데이트를 보장한다.
+- D-040 연계:
+  - Pipeline B `gold.exception_ledger` 멱등성 키
+    `(date_kst, domain, exception_type, run_id, metric, message)`는 변경하지 않는다.
+  - readiness 실패는 신규 예외 적재 확장 없이 즉시 실패로 처리한다.
 - 근거:
-  - 코드: `scripts/run_pipeline_b.py`, `scripts/run_pipeline_c.py`, `scripts/e2e/setup_e2e_env.py`
-  - 문서: `.specs/project_specs.md`, `.specs/ops/operations_runbook.md`
+  - 코드: `scripts/run_pipeline_silver.py`, `scripts/run_pipeline_b.py`, `scripts/run_pipeline_c.py`, `src/io/upstream_readiness.py`, `src/common/window_defaults.py`, `databricks.yml`
+  - 문서: `.specs/project_specs.md`, `.specs/ops/operations_runbook.md`, `.specs/ops/cutover_preflight_exit_template.md`
 
 ### D-036 룰 SSOT 전환(`mock seed` -> `gold.dim_rule_scd2`)
 - 상태: **결정됨(2026-02-11)**
@@ -285,7 +296,7 @@
   - 룰 변경이 코드 배포/파일 교체에 묶여 운영 민첩성과 감사 일관성이 낮아진다.
 - 결정:
   1) 운영 룰 SSOT는 `gold.dim_rule_scd2`로 고정한다.
-  2) 룰 로딩 정책은 `run_pipeline_a/b --rule-load-mode`로 제어한다.
+  2) 룰 로딩 정책은 `run_pipeline_a/b/silver --rule-load-mode`로 제어한다.
      - `prod`: `strict`(table only, fail-closed)
      - `dev/test`: `fallback`(table 우선, 실패 시 seed fallback)
   3) 룰 거버넌스(승인/버전/유효기간) SSOT는 `.specs/ops/operations_runbook.md`로 고정한다.
@@ -293,10 +304,10 @@
 - 구현:
   1) 계약/메타데이터: `gold.dim_rule_scd2` 추가
   2) 룰 로더: `load_rule_table`, `load_runtime_rules` 추가
-  3) 런타임: `scripts/run_pipeline_a.py`, `scripts/run_pipeline_b.py`에 rule load 파라미터 추가
+  3) 런타임: `scripts/run_pipeline_a.py`, `scripts/run_pipeline_b.py`, `scripts/run_pipeline_silver.py`에 rule load 파라미터 추가
   4) E2E setup: `gold.dim_rule_scd2` seed sync 후 table 경유 로딩
 - 근거:
-  - 코드: `src/io/rule_loader.py`, `scripts/run_pipeline_a.py`, `scripts/run_pipeline_b.py`, `scripts/sync_dim_rule_scd2.py`, `databricks.yml`
+  - 코드: `src/io/rule_loader.py`, `scripts/run_pipeline_a.py`, `scripts/run_pipeline_b.py`, `scripts/run_pipeline_silver.py`, `scripts/sync_dim_rule_scd2.py`, `databricks.yml`
   - 문서: `.specs/project_specs.md`, `.specs/data_contract.md`, `.specs/ops/operations_runbook.md`
 
 ### D-037 모니터링 SSOT 충돌 해소
@@ -332,18 +343,25 @@
   - 문서: `.specs/ops/performance_partitioning_checklist.md`
 
 ### D-039 설정 SSOT 연결 + 하드코딩 제거
-- 상태: **결정 필요(2026-02-11)**
+- 상태: **결정됨(2026-02-12)**
 - 배경:
-  - `configs/common.yaml`, `configs/dev.yaml`, `configs/prod.yaml`가 존재하지만 런타임 스크립트가 직접 소비하지 않는다.
-  - 운영 setup 스크립트에 catalog 하드코딩이 남아 있다.
+  - `configs/common.yaml`, `configs/dev.yaml`, `configs/prod.yaml`가 존재하지만 런타임 스크립트가 직접 소비하지 않았다.
+  - 런타임 스크립트에 catalog(`2dt_final_team4_databricks_test`), secret_scope, secret_key가 하드코딩되어 있었다.
 - 영향:
   - 환경 전환(dev/prod) 시 설정 드리프트와 배포 실수 가능성이 증가한다.
-- 결정 필요:
-  1) 런타임 파라미터 SSOT를 `configs/*.yaml`로 일원화할지
-  2) Databricks job parameter 중심을 유지하고 설정 파일은 참고 문서로 한정할지
-  3) 하드코딩 제거 대상/순서를 어떤 기준으로 우선화할지
+- 결정:
+  1) `configs/*.yaml`을 런타임 SSOT로 승격한다. `src/common/config_loader.py`가 이를 로딩한다.
+  2) `databricks.yml`은 job parameter 전달 역할을 유지한다(CLI args > env vars > configs/{env}.yaml > configs/common.yaml).
+  3) 하드코딩 제거 대상: `--catalog` 기본값(A/B/C/Silver 4개 스크립트), `--secret-scope`/`--secret-key`(Pipeline C), `DEFAULT_SECRET_SCOPE`/`DEFAULT_SECRET_KEY`(`secret_loader.py`).
+  4) `_default_repo_root()` 중복 함수(4개 스크립트 동일)를 `config_loader.find_repo_root()`로 통합한다.
+- 구현:
+  - 신규: `src/common/config_loader.py` (load_config, get_config_value, find_repo_root)
+  - 수정: `scripts/run_pipeline_a.py`, `scripts/run_pipeline_b.py`, `scripts/run_pipeline_c.py`, `scripts/run_pipeline_silver.py`, `src/io/secret_loader.py`
+  - 보강: `configs/common.yaml`에 `databricks.catalog: null` 추가
+  - 의존성: `requirements-dev.txt`에 `pyyaml` 추가
+  - 테스트: `tests/unit/test_config_loader.py` (13 cases)
 - 근거:
-  - 코드: `configs/common.yaml`, `configs/dev.yaml`, `configs/prod.yaml`, `scripts/phase7/setup_minimal_cloud.sh`
+  - 코드: `src/common/config_loader.py`, `configs/common.yaml`, `configs/dev.yaml`, `configs/prod.yaml`
   - 문서: `.specs/cloud/cloud_migration_rebuild_plan.md`
 
 ### D-040 `gold.exception_ledger` 멱등성 충돌(재실행 시 MERGE 실패)
@@ -354,7 +372,7 @@
   - 기존 `gold.exception_ledger` MERGE 키 `(date_kst, domain, exception_type, run_id)`는 동일 run 내 다건 예외를 구분하지 못했다.
 - 영향:
   - 같은 입력/같은 `run_id` 재실행 시 Pipeline B 멱등성 검증이 실패한다.
-  - L3 acceptance를 통과할 수 없어 D-036 운영 전환 검증이 블로킹된다.
+  - 당시 L3 acceptance를 통과하지 못해 D-036 운영 전환 검증이 블로킹되었다.
 - 결정:
   1) 예외 적재 단위는 행 단위를 유지한다(집계 전환하지 않음).
   2) `gold.exception_ledger` MERGE 키를 `(date_kst, domain, exception_type, run_id, metric, message)`로 확장한다.
