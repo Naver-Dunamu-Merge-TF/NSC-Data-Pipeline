@@ -2,6 +2,10 @@
 
 Last updated: 2026-02-11
 
+SSOT:
+- 본 문서는 모니터링 범위와 알림 정책의 최상위 SSOT다.
+- 관련 결정 로그는 `.specs/decision_open_items.md`의 D-037, D-022, D-024를 따른다.
+
 ## 1. Goal
 
 - 목적: Azure Monitor + Log Analytics만으로 즉시 구현 가능한 운영 관측을 먼저 구축한다.
@@ -13,7 +17,11 @@ Last updated: 2026-02-11
 1. Databricks 진단 로그 기반 실행 관측
 2. Azure Activity Log 기반 플랫폼 이벤트 관측
 3. A/B/C 통합 대시보드 1개(Workbook)
-4. 실행 안정성 알림 규칙(Core Execution Alerts)
+4. 실행 안정성 알림 규칙(Core Execution Alerts 4종)
+   - Job 실패
+   - 최근 성공 지연
+   - 재시도 소진
+   - 클러스터 시작 실패/타임아웃
 
 ## 3. Out-of-Scope (Now)
 
@@ -25,7 +33,7 @@ Last updated: 2026-02-11
 4. `SOURCE_STALE`/`EVENT_DROP_SUSPECTED`의 데이터 기반 억제 로직
 
 비고:
-- 위 항목은 Databricks SQL Alert 또는 별도 export job 도입 시 확장한다.
+- 위 항목은 v2 scope에서 Databricks SQL Alert 또는 별도 export job 도입 시 확장한다.
 
 ## 4. KPI v1 (Log Analytics Only)
 
@@ -87,9 +95,16 @@ Last updated: 2026-02-11
 2. 임계치 노이즈 점검 후 조정
 3. 비용/보존 정책 점검
 
-## 8. Expansion Backlog (Later)
+## 8. Expansion Backlog (Later = v2 Scope)
 
-1. Databricks SQL Alert로 DQ KPI(`dq_status`, `exception_ledger`) 추가
-2. 필요 시 테이블 KPI 일부를 Log Analytics로 export하는 경량 job 도입
-3. 팀원 워크플로우 온보딩(A/B/C 이후)
-4. RBAC 역할 분리(Contributor -> Admin/Operator/Viewer)
+1. D-022(v2): 테이블 기반 모니터링 신호 확장
+   - `gold.pipeline_state`
+   - `silver.dq_status`
+   - `gold.exception_ledger`
+2. D-024(v2): 테이블 기반 데이터 품질 알림 확장
+   - `DQ CRITICAL` 알림
+   - `SOURCE_STALE`/`EVENT_DROP_SUSPECTED` 지속 알림
+3. Databricks SQL Alert로 DQ KPI(`dq_status`, `exception_ledger`) 추가
+4. 필요 시 테이블 KPI 일부를 Log Analytics로 export하는 경량 job 도입
+5. 팀원 워크플로우 온보딩(A/B/C 이후)
+6. RBAC 역할 분리(Contributor -> Admin/Operator/Viewer)

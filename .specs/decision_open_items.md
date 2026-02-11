@@ -148,12 +148,12 @@
 
 ### D-022 Azure 모니터링 데이터 소스 범위
 - 상태: **결정됨(2026-02-11)**
-- 결정: 하이브리드 소스를 사용한다.
-  - Databricks 진단 로그(실행/실패)
-  - `gold.pipeline_state`
-  - `silver.dq_status`
-  - `gold.exception_ledger`
-- 영향: 실행 실패와 데이터 품질 이상을 분리 관측할 수 있다.
+- 결정:
+  - 현재(v1): 운영 알림 소스는 Databricks 진단 로그 + Azure Activity Log로 고정한다.
+  - 향후(v2): `gold.pipeline_state`, `silver.dq_status`, `gold.exception_ledger`를 테이블 기반 모니터링 신호로 확장한다.
+- 영향:
+  - 현재 운영 경보 범위를 명확히 유지하면서, 실행 실패와 데이터 품질 이상 분리 관측을 위한 확장 경로를 보존한다.
+- 참조: D-037 (모니터링 SSOT 충돌 해소)
 - 근거: 사용자 결정(옵션 A)
 
 ### D-023 모니터링 적용 환경 범위
@@ -164,12 +164,16 @@
 
 ### D-024 초기 알림 규칙 세트
 - 상태: **결정됨(2026-02-11)**
-- 결정: 초기 알림은 Core 4만 적용한다.
-  1) Job 실패
-  2) 최근 성공 지연(SLA breach)
-  3) DQ CRITICAL 발생
-  4) `SOURCE_STALE`/`EVENT_DROP_SUSPECTED` 지속
-- 영향: 초기 운영 노이즈를 제한하면서 핵심 장애를 우선 탐지한다.
+- 결정:
+  - 현재(v1): 초기 알림은 실행 안정성 Core 4만 적용한다.
+    1) Job 실패
+    2) 최근 성공 지연(SLA breach)
+    3) 재시도 소진
+    4) 클러스터 시작 실패/타임아웃
+  - 향후(v2): `DQ CRITICAL` 및 `SOURCE_STALE`/`EVENT_DROP_SUSPECTED` 지속 알림은 테이블 기반 신호 도입 시 확장한다.
+- 영향:
+  - 현재 운영 노이즈를 제한하면서 온콜 페이지 기준을 Core 4로 고정하고, 데이터 품질 경보 확장 여지를 유지한다.
+- 참조: D-037 (모니터링 SSOT 충돌 해소)
 - 근거: 사용자 결정(옵션 A)
 
 ### D-025 임계치 운영 방식
@@ -240,20 +244,22 @@
   - 코드: `src/common/contracts.py`, `src/common/table_metadata.py`, `src/transforms/silver_controls.py`, `src/transforms/analytics.py`, `scripts/e2e/setup_e2e_env.py`
 
 ### D-034 운영 부트스트랩(UC schema/table) 정책
-- 상태: **결정됨(2026-02-11, 미구현)**
+- 상태: **결정됨**
 - 결정:
   1) 운영에서는 `scripts/e2e/setup_e2e_env.py`를 사용하지 않는다.
   2) 운영 실행 전 `catalog.bronze/silver/gold` 스키마와 계약 테이블 존재를 사전 보장한다.
   3) 부트스트랩 범위는 `스키마+테이블 생성`으로 고정한다(데이터 적재/물질화 제외).
-- 미구현:
-  1) 운영 bootstrap 전용 job/script 미구현
-  2) cutover/runbook 실행 단계에 bootstrap 절차 미반영
+- 구현:
+  1) 공유 모듈: `src/io/catalog_bootstrap.py`
+  2) 운영 스크립트: `scripts/bootstrap_catalog.py` (`--catalog` 필수, `--dry-run` 지원)
+  3) Databricks job: `bootstrap_catalog` (`databricks.yml`)
+  4) cutover 절차에 bootstrap 단계 반영: `.specs/ops/cutover_preflight_exit_template.md`
 - 영향:
   - 운영 시작 전 테이블 부재로 인한 첫 실행 실패 가능성을 낮춘다.
   - E2E 보조 스크립트 의존 없이 운영 경로를 분리할 기준을 확보한다.
 - 근거:
-  - 코드: `databricks.yml`, `scripts/e2e/setup_e2e_env.py`, `src/common/contracts.py`
-  - 문서: `.specs/cloud/cloud_migration_rebuild_plan.md`, `.specs/ops/cutover_preflight_exit_template.md`
+  - 코드: `databricks.yml`, `src/io/catalog_bootstrap.py`, `scripts/bootstrap_catalog.py`, `src/common/contracts.py`
+  - 문서: `.specs/ops/cutover_preflight_exit_template.md`
 
 ### D-035 Silver 운영 물질화 경로
 - 상태: **결정 필요(2026-02-11)**
@@ -271,31 +277,42 @@
   - 문서: `.specs/project_specs.md`, `.specs/ops/operations_runbook.md`
 
 ### D-036 룰 SSOT 전환(`mock seed` -> `gold.dim_rule_scd2`)
-- 상태: **결정 필요(2026-02-11)**
+- 상태: **결정됨(2026-02-11)**
 - 배경:
   - 런타임 룰 로딩이 `mock_data/fixtures/dim_rule_scd2.json` 기반으로 고정되어 있다.
   - 운영 문서는 `gold.dim_rule_scd2` 점검/사용을 전제로 서술되어 있다.
 - 영향:
   - 룰 변경이 코드 배포/파일 교체에 묶여 운영 민첩성과 감사 일관성이 낮아진다.
-- 결정 필요:
-  1) 운영 룰 SSOT를 `gold.dim_rule_scd2`로 확정할지
-  2) 전환 전/후 fallback 정책(테이블 우선, seed fallback 허용 여부)을 어떻게 둘지
-  3) 룰 변경 배포 절차(승인/버전/유효기간)를 어디에 고정할지
+- 결정:
+  1) 운영 룰 SSOT는 `gold.dim_rule_scd2`로 고정한다.
+  2) 룰 로딩 정책은 `run_pipeline_a/b --rule-load-mode`로 제어한다.
+     - `prod`: `strict`(table only, fail-closed)
+     - `dev/test`: `fallback`(table 우선, 실패 시 seed fallback)
+  3) 룰 거버넌스(승인/버전/유효기간) SSOT는 `.specs/ops/operations_runbook.md`로 고정한다.
+  4) 룰 반영 경로는 전용 sync job(`scripts/sync_dim_rule_scd2.py`, `databricks.yml:sync_dim_rule_scd2`)으로 운영한다.
+- 구현:
+  1) 계약/메타데이터: `gold.dim_rule_scd2` 추가
+  2) 룰 로더: `load_rule_table`, `load_runtime_rules` 추가
+  3) 런타임: `scripts/run_pipeline_a.py`, `scripts/run_pipeline_b.py`에 rule load 파라미터 추가
+  4) E2E setup: `gold.dim_rule_scd2` seed sync 후 table 경유 로딩
 - 근거:
-  - 코드: `scripts/run_pipeline_a.py`, `scripts/run_pipeline_b.py`, `src/io/rule_loader.py`
-  - 문서: `.specs/project_specs.md`, `.specs/ops/operations_runbook.md`
+  - 코드: `src/io/rule_loader.py`, `scripts/run_pipeline_a.py`, `scripts/run_pipeline_b.py`, `scripts/sync_dim_rule_scd2.py`, `databricks.yml`
+  - 문서: `.specs/project_specs.md`, `.specs/data_contract.md`, `.specs/ops/operations_runbook.md`
 
 ### D-037 모니터링 SSOT 충돌 해소
-- 상태: **결정 필요(2026-02-11)**
+- 상태: **결정됨(2026-02-11)**
 - 배경:
   - 결정 로그(D-022, D-024)는 테이블 기반 모니터링 신호 포함으로 기록되어 있다.
   - 운영/모니터링 문서는 현재 v1 범위에서 테이블 기반 알림을 Out-of-Scope로 명시한다.
 - 영향:
   - 운영팀이 실제 경보 범위를 오해할 수 있고, 온콜 대응 기준이 문서마다 달라질 수 있다.
-- 결정 필요:
-  1) 현재 운영 SSOT를 v1(Log Analytics only)로 확정할지
-  2) 또는 D-022/D-024 방향으로 문서/구현 범위를 상향할지
-  3) 확정 후 어느 문서를 최상위 SSOT로 둘지(결정 로그 vs 모니터링 계획)
+- 결정:
+  1) Current = v1(Log Analytics only)로 확정한다.
+  2) Future = v2(테이블 기반 알림 확장)로 분리한다.
+  3) 모니터링 최상위 SSOT는 `.specs/ops/azure_monitoring_integration_plan.md`로 고정한다.
+- 후속 정렬:
+  - D-022, D-024는 `현재(v1)/향후(v2)` 구조로 재정의해 이력을 보존한다.
+  - `.specs/ops/operations_runbook.md`, `.specs/project_specs.md`, `.specs/ops/cutover_preflight_exit_template.md`는 v1 기준 문구로 정렬한다.
 - 근거:
   - 문서: `.specs/decision_open_items.md`, `.specs/ops/azure_monitoring_integration_plan.md`, `.specs/ops/operations_runbook.md`
 

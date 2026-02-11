@@ -31,6 +31,7 @@ Last updated: 2026-02-11
 - `start_ts`, `end_ts` (UTC window)
 - `date_kst_start`, `date_kst_end` (backfill day window)
 - `run_id`
+- `rule_load_mode` (A/B 전용): `strict | fallback`
 
 Pipeline B task 구성:
 - `pipeline_b_recon`
@@ -41,20 +42,29 @@ Pipeline B task 구성:
 ## 3. Monitoring Model (Azure Monitoring v1)
 
 원칙:
+- 알림 범위/정의 충돌 시 `.specs/ops/azure_monitoring_integration_plan.md`를 최우선 SSOT로 적용한다.
 - 알림은 Azure Monitor + Log Analytics의 실행 신호 중심으로 운영한다.
-- 데이터 테이블(`pipeline_state`, `dq_status`, `exception_ledger`)은 triage/사후분석 SSOT로 사용한다.
+- 데이터 테이블(`pipeline_state`, `dq_status`, `exception_ledger`)은 alert source가 아니라 triage/사후분석 SSOT로 사용한다.
 
 현재 In-Scope (알림):
 - Databricks 진단 로그 기반 실행 관측
 - Activity Log 기반 플랫폼 이벤트
 - A/B/C 통합 Workbook 1개
-- Core Execution Alerts 4종
+- Core Execution Alerts 4종 (v1 page 보장 범위)
+  - Job 실패
+  - 최근 성공 지연
+  - 재시도 소진
+  - 클러스터 시작 실패/타임아웃
 
 현재 Out-of-Scope (알림):
 - `silver.dq_status` 기반 알림
 - `gold.exception_ledger` row 기반 CRITICAL 집계 알림
 - `gold.pipeline_state` row 기반 `last_success_ts` 정확 집계 알림
 - `SOURCE_STALE`/`EVENT_DROP_SUSPECTED`의 테이블 기반 억제 알림
+
+모니터링 신호 역할 구분:
+- Alert source(v1): Databricks 진단 로그, Azure Activity Log
+- Triage source(v1): `gold.pipeline_state`, `silver.dq_status`, `gold.exception_ledger`
 
 ## 4. Alert Policy (Core Execution Alerts)
 
@@ -196,6 +206,34 @@ databricks bundle run pipeline_c_analytics -t dev \
 DELETE FROM ${catalog}.silver.bad_records
 WHERE detected_date_kst < date_sub(current_date(), 180);
 ```
+
+### 7.2 `gold.dim_rule_scd2` 변경 거버넌스 (SSOT)
+
+역할:
+- Owner: 데이터 오너(룰 변경 요청/근거 작성)
+- Reviewer: 온콜/운영 리뷰어(임계치/영향 검토 승인)
+
+버전/유효기간 규칙:
+- `rule_id`는 전역 유일해야 한다.
+- 동일 `domain+metric`에서 `is_current=true`는 1건만 허용한다.
+- 변경 시 기존 current rule은 `effective_end_ts`를 닫고 `is_current=false`로 전환한다.
+
+적용 절차:
+1. 변경 seed 파일(`mock_data/fixtures/dim_rule_scd2.json`) 업데이트
+2. 배포 전 검토(Owner/Reviewer 승인 기록)
+3. Databricks 수동 job 실행
+```bash
+databricks bundle run sync_dim_rule_scd2 -t <dev|prod> \
+  --params seed_path=mock_data/fixtures/dim_rule_scd2.json
+```
+4. 검증 쿼리 실행
+```sql
+SELECT domain, metric, count_if(is_current) AS current_cnt
+FROM ${catalog}.gold.dim_rule_scd2
+GROUP BY domain, metric
+ORDER BY domain, metric;
+```
+5. 증적 저장(`.agents/logs/verification/`): 승인자, 실행자, seed revision, 결과 row count
 
 ## 8. Escalation
 

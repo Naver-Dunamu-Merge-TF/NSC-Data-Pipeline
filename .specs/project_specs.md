@@ -6,7 +6,8 @@ Last updated: 2026-02-11
 > DB 스키마 스냅샷: `.ref/database_schema`  
 > FR-ADM-02 Serving 경계: `.ref/backoffice_db_admin_api.md`  
 > 데이터 계약 SSOT: `.specs/data_contract.md`  
-> 운영/모니터링 기준: `.specs/ops/operations_runbook.md`, `.specs/ops/azure_monitoring_integration_plan.md`  
+> 운영 기준: `.specs/ops/operations_runbook.md`  
+> 모니터링 SSOT: `.specs/ops/azure_monitoring_integration_plan.md`  
 > 결정 로그: `.specs/decision_open_items.md`
 
 ---
@@ -28,12 +29,13 @@ Last updated: 2026-02-11
   - `gold.exception_ledger`
   - `gold.pipeline_state`
 - `silver.bad_records` 영속화 구현 (현재 경로: E2E setup, 저장 후 fail-fast)
+- `gold.dim_rule_scd2` 테이블 기반 룰 로딩 구현
+  - Pipeline A/B: `--rule-load-mode` 기반(`strict|fallback`)
+  - 운영 기본 정책: prod `strict`, dev/test `fallback`
 
 ### 0.2 Planned / Backlog (미구현 또는 확정 전)
 
 - `gold.fact_market_price` (FR-ANA-02) 미구현
-- `gold.dim_rule_scd2` Delta 테이블 기반 룰 로딩 미구현
-  - 현재는 `mock_data/fixtures/dim_rule_scd2.json` seed 로딩
 
 ---
 
@@ -239,15 +241,15 @@ Planned:
 - DQ Guardrail: `>=` 비교
 - Ledger Controls: `>` 비교
 
-### 5.2 룰 로딩 소스 (Current vs Planned)
+### 5.2 룰 로딩 소스 (Current)
 
-Current:
-
-- `mock_data/fixtures/dim_rule_scd2.json`에서 룰 로딩
-
-Planned:
-
-- `gold.dim_rule_scd2` 테이블을 룰 SSOT로 전환
+- 룰 SSOT: `gold.dim_rule_scd2`
+- Pipeline A/B 런타임:
+  - `strict`: 테이블 로딩 실패 시 즉시 실패(fail-closed)
+  - `fallback`: 테이블 우선, 실패 시 `mock_data/fixtures/dim_rule_scd2.json` fallback
+- 기본 운영 정책:
+  - prod: `strict`
+  - dev/test: `fallback`
 
 ### 5.3 주요 결정 연계
 
@@ -285,6 +287,11 @@ Planned:
 
 ## 7) 모니터링/알림 기준 (Current = Azure Monitoring v1)
 
+기준:
+- Current = v1(Log Analytics only)
+- Future = v2(테이블 기반 알림 확장)
+- 모니터링 범위 충돌 시 최상위 SSOT는 `.specs/ops/azure_monitoring_integration_plan.md`를 따른다.
+
 ### 7.1 In-Scope
 
 - Databricks 진단 로그 기반 실행 관측
@@ -305,6 +312,7 @@ Planned:
 
 주의:
 - 따라서 “`exception_ledger` CRITICAL이면 즉시 알림”은 현재 v1 범위에서는 보장하지 않는다.
+- `DQ CRITICAL`, `SOURCE_STALE`, `EVENT_DROP_SUSPECTED` 알림은 v2 확장 범위다.
 
 ---
 
@@ -375,5 +383,6 @@ Planned:
 ## 12) 즉시 후속 정합화 항목
 
 1. `silver.bad_records` 운영 경로 정식화(`run_pipeline_silver` 또는 동등 경로) 여부 검토
-2. `gold.dim_rule_scd2` 실테이블 룰 로딩 전환 여부 확정
+2. 룰 변경 거버넌스(runbook 절차) 운영 증적 축적 및 정기 점검
 3. `data_contract.md`와 `project_specs.md`의 Current/Planned 표기를 동일 기준으로 유지
+4. v2 모니터링 확장 준비(테이블 기반 알림: `dq_status`, `exception_ledger`, `pipeline_state`, stale/drop 억제)
