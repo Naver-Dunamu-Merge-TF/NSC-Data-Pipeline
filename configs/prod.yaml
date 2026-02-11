@@ -14,6 +14,9 @@ storage:
   external_location: "<prod-external-location>"
   base_path: "abfss://<container>@<storage-account>.dfs.core.windows.net"
 
+analytics:
+  secret_scope: "<prod-secret-scope>"
+
 jobs:
   pipeline_a_job_id: "<prod-pipeline-a-job-id>"
   pipeline_b_job_id: "<prod-pipeline-b-job-id>"

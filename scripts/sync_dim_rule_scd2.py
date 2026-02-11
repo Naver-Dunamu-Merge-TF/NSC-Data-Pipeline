@@ -1,34 +1,16 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from collections import defaultdict
 from pathlib import Path
 
+# Bootstrap: ensure repo root is on sys.path for src.* imports.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-def _default_repo_root() -> Path:
-    candidates: list[Path] = []
-
-    file_name = globals().get("__file__") or _default_repo_root.__code__.co_filename
-    if file_name:
-        candidates.append(Path(file_name))
-
-    if sys.argv and sys.argv[0]:
-        candidates.append(Path(sys.argv[0]))
-
-    candidates.append(Path.cwd())
-
-    env_root = os.environ.get("PIPELINE_ROOT")
-    if env_root:
-        candidates.append(Path(env_root))
-
-    for base in candidates:
-        for probe in (base, base.parent, *base.parents):
-            if (probe / "src").is_dir():
-                return probe
-
-    return Path(env_root or "/dbfs/tmp/data-pipeline")
+from src.common.config_loader import find_repo_root  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -48,7 +30,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--repo-root",
-        default=str(_default_repo_root()),
+        default=str(find_repo_root()),
     )
     return parser.parse_args()
 

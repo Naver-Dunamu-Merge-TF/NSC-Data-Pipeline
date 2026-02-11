@@ -2,6 +2,9 @@ project:
   name: data-pipeline
   timezone: Asia/Seoul
 
+databricks:
+  catalog: null
+
 run_defaults:
   run_mode: incremental
   start_ts: null
@@ -27,6 +30,5 @@ workflows:
     - 2dt026@msacademy.msai.kr
 
 analytics:
-  secret_scope: ledger-analytics-dev
   secret_key: salt_user_key
   local_dummy_salt_env: ANON_USER_KEY_SALT

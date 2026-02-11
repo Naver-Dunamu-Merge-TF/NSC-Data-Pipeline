@@ -14,6 +14,9 @@ storage:
   external_location: team4_adls_test
   base_path: abfss://2dt-final-team4-adls-test@2dtfinalteam4storagetest.dfs.core.windows.net
 
+analytics:
+  secret_scope: ledger-analytics-dev
+
 jobs:
   pipeline_a_job_id: "57710310442212"
   pipeline_b_job_id: null

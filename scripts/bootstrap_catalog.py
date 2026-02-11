@@ -12,35 +12,13 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import sys
 from pathlib import Path
 
-
-def _default_repo_root() -> Path:
-    """Best-effort repo root resolution for Databricks Jobs/Bundles."""
-
-    candidates: list[Path] = []
-
-    file_name = globals().get("__file__") or _default_repo_root.__code__.co_filename
-    if file_name:
-        candidates.append(Path(file_name))
-
-    if sys.argv and sys.argv[0]:
-        candidates.append(Path(sys.argv[0]))
-
-    candidates.append(Path.cwd())
-
-    env_root = os.environ.get("PIPELINE_ROOT")
-    if env_root:
-        candidates.append(Path(env_root))
-
-    for base in candidates:
-        for probe in (base, base.parent, *base.parents):
-            if (probe / "src").is_dir():
-                return probe
-
-    return Path(env_root or "/dbfs/tmp/data-pipeline")
+# Bootstrap: ensure repo root is on sys.path for src.* imports.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 
 def parse_args() -> argparse.Namespace:
@@ -68,9 +46,6 @@ def main() -> None:
     log = logging.getLogger("bootstrap_catalog")
 
     args = parse_args()
-    repo_root = _default_repo_root()
-    if repo_root.as_posix() not in sys.path:
-        sys.path.insert(0, repo_root.as_posix())
 
     from src.io.catalog_bootstrap import (
         create_all_tables,

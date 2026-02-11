@@ -1,44 +1,25 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
+# Bootstrap: ensure repo root is on sys.path for src.* imports.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-def _default_repo_root() -> Path:
-    """Best-effort repo root resolution for Databricks Jobs/Bundles."""
-    candidates: list[Path] = []
-
-    file_name = globals().get("__file__") or _default_repo_root.__code__.co_filename
-    if file_name:
-        candidates.append(Path(file_name))
-
-    if sys.argv and sys.argv[0]:
-        candidates.append(Path(sys.argv[0]))
-
-    candidates.append(Path.cwd())
-
-    env_root = os.environ.get("PIPELINE_ROOT")
-    if env_root:
-        candidates.append(Path(env_root))
-
-    for base in candidates:
-        for probe in (base, base.parent, *base.parents):
-            if (probe / "src").is_dir() and (probe / "mock_data").is_dir():
-                return probe
-
-    return Path(env_root or "/dbfs/tmp/data-pipeline")
+from src.common.config_loader import find_repo_root, get_config_value  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run Pipeline A (Guardrail DQ) in Databricks."
     )
-    parser.add_argument("--catalog", default="2dt_final_team4_databricks_test")
+    parser.add_argument("--catalog", default=get_config_value("databricks.catalog"))
     parser.add_argument("--run-mode", default="incremental")
     parser.add_argument("--start-ts")
     parser.add_argument("--end-ts")
@@ -63,7 +44,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--repo-root",
-        default=str(_default_repo_root()),
+        default=str(find_repo_root()),
     )
     return parser.parse_args()
 
