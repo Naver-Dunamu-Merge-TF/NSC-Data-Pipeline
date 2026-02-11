@@ -94,13 +94,15 @@ def build_bad_record(
     run_id: str,
     rule_id: str | None = None,
 ) -> dict[str, Any]:
+    detected_at = now_utc()
     return {
+        "detected_date_kst": date_kst(detected_at),
         "source_table": source_table,
         "reason": reason,
         "record_json": json.dumps(record, default=str, ensure_ascii=True),
         "run_id": run_id,
         "rule_id": rule_id,
-        "detected_at": now_utc(),
+        "detected_at": detected_at,
     }
 
 

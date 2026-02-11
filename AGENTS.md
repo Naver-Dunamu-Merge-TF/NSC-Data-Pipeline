@@ -126,6 +126,11 @@ Verification policy
 | L2 | Pre-PR | < 10min | `pytest --cov-fail-under=80` | 80%+ coverage |
 | L3 | Pre-merge | < 30min | Databricks Dev E2E | Idempotency verified |
 
+### L3 execution standard
+
+ -  Poll Databricks run status every 20 seconds.
+ -  Use a 10-minute timeout for L3 verification runs.
+
 ### Escalation triggers
 
  -  If in doubt, move up one level.

@@ -35,3 +35,15 @@ def test_pipeline_state_contract_exists() -> None:
     cast_map = contract.cast_map
     assert cast_map["pipeline_name"] == "string"
     assert cast_map["last_processed_end"] == "timestamp"
+
+
+def test_silver_bad_records_contract_exists() -> None:
+    contract = get_contract("silver.bad_records")
+    assert contract.required_columns == {
+        "detected_date_kst",
+        "source_table",
+        "reason",
+        "record_json",
+        "run_id",
+        "detected_at",
+    }

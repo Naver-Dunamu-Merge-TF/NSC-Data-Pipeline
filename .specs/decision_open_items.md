@@ -223,3 +223,108 @@
 - 결정: 정기 검증(월 1회 game-day: 실패/지연/DQ 경보 시나리오)을 운영한다.
 - 영향: 경보/런북 드리프트를 조기에 발견할 수 있다.
 - 근거: 사용자 결정(옵션 A)
+
+### D-033 `silver.bad_records` 영속화 방식
+- 상태: **결정됨(2026-02-11)**
+- 결정:
+  1) `silver.bad_records` 단일 통합 테이블을 운영 산출물로 도입한다.
+  2) 적재 정책은 append-only로 고정하고 파티션 키는 `detected_date_kst`를 사용한다.
+  3) E2E setup 경로에서 **격리 저장 후 fail-fast** 순서를 고정한다.
+  4) fail-fast 적용 대상은 `silver.wallet_snapshot`, `silver.ledger_entries`로 유지한다.
+  5) `record_json`은 원본 전체를 저장하고, 보존 정책은 180일 + 월 1회 정리로 운영한다.
+- 영향:
+  - 계약 위반 row의 재처리/감사 추적성을 확보한다.
+  - quarantine 원칙과 구현 상태를 일치시킨다.
+- 근거:
+  - 문서: `.specs/project_specs.md`, `.specs/data_contract.md`, `.specs/ops/operations_runbook.md`
+  - 코드: `src/common/contracts.py`, `src/common/table_metadata.py`, `src/transforms/silver_controls.py`, `src/transforms/analytics.py`, `scripts/e2e/setup_e2e_env.py`
+
+### D-034 운영 부트스트랩(UC schema/table) 정책
+- 상태: **결정됨(2026-02-11, 미구현)**
+- 결정:
+  1) 운영에서는 `scripts/e2e/setup_e2e_env.py`를 사용하지 않는다.
+  2) 운영 실행 전 `catalog.bronze/silver/gold` 스키마와 계약 테이블 존재를 사전 보장한다.
+  3) 부트스트랩 범위는 `스키마+테이블 생성`으로 고정한다(데이터 적재/물질화 제외).
+- 미구현:
+  1) 운영 bootstrap 전용 job/script 미구현
+  2) cutover/runbook 실행 단계에 bootstrap 절차 미반영
+- 영향:
+  - 운영 시작 전 테이블 부재로 인한 첫 실행 실패 가능성을 낮춘다.
+  - E2E 보조 스크립트 의존 없이 운영 경로를 분리할 기준을 확보한다.
+- 근거:
+  - 코드: `databricks.yml`, `scripts/e2e/setup_e2e_env.py`, `src/common/contracts.py`
+  - 문서: `.specs/cloud/cloud_migration_rebuild_plan.md`, `.specs/ops/cutover_preflight_exit_template.md`
+
+### D-035 Silver 운영 물질화 경로
+- 상태: **결정 필요(2026-02-11)**
+- 배경:
+  - Pipeline B/C는 `silver.*` 입력을 읽지만, 운영 `run_pipeline_*` 경로에는 Bronze->Silver 물질화 단계가 없다.
+  - 현재 Silver 물질화는 E2E setup 경로(`scripts/e2e/setup_e2e_env.py`)에 사실상 집중되어 있다.
+- 영향:
+  - 운영에서 Silver 갱신이 보장되지 않으면 B/C 산출물 stale 또는 미생성 리스크가 발생한다.
+- 결정 필요:
+  1) 전용 Silver job(`run_pipeline_silver`)을 도입할지
+  2) Pipeline A 또는 B/C 내부로 Silver 물질화를 포함할지
+  3) 스케줄/멱등성/실패 전파 기준(특히 B/C dependency)을 어떻게 고정할지
+- 근거:
+  - 코드: `scripts/run_pipeline_b.py`, `scripts/run_pipeline_c.py`, `scripts/e2e/setup_e2e_env.py`
+  - 문서: `.specs/project_specs.md`, `.specs/ops/operations_runbook.md`
+
+### D-036 룰 SSOT 전환(`mock seed` -> `gold.dim_rule_scd2`)
+- 상태: **결정 필요(2026-02-11)**
+- 배경:
+  - 런타임 룰 로딩이 `mock_data/fixtures/dim_rule_scd2.json` 기반으로 고정되어 있다.
+  - 운영 문서는 `gold.dim_rule_scd2` 점검/사용을 전제로 서술되어 있다.
+- 영향:
+  - 룰 변경이 코드 배포/파일 교체에 묶여 운영 민첩성과 감사 일관성이 낮아진다.
+- 결정 필요:
+  1) 운영 룰 SSOT를 `gold.dim_rule_scd2`로 확정할지
+  2) 전환 전/후 fallback 정책(테이블 우선, seed fallback 허용 여부)을 어떻게 둘지
+  3) 룰 변경 배포 절차(승인/버전/유효기간)를 어디에 고정할지
+- 근거:
+  - 코드: `scripts/run_pipeline_a.py`, `scripts/run_pipeline_b.py`, `src/io/rule_loader.py`
+  - 문서: `.specs/project_specs.md`, `.specs/ops/operations_runbook.md`
+
+### D-037 모니터링 SSOT 충돌 해소
+- 상태: **결정 필요(2026-02-11)**
+- 배경:
+  - 결정 로그(D-022, D-024)는 테이블 기반 모니터링 신호 포함으로 기록되어 있다.
+  - 운영/모니터링 문서는 현재 v1 범위에서 테이블 기반 알림을 Out-of-Scope로 명시한다.
+- 영향:
+  - 운영팀이 실제 경보 범위를 오해할 수 있고, 온콜 대응 기준이 문서마다 달라질 수 있다.
+- 결정 필요:
+  1) 현재 운영 SSOT를 v1(Log Analytics only)로 확정할지
+  2) 또는 D-022/D-024 방향으로 문서/구현 범위를 상향할지
+  3) 확정 후 어느 문서를 최상위 SSOT로 둘지(결정 로그 vs 모니터링 계획)
+- 근거:
+  - 문서: `.specs/decision_open_items.md`, `.specs/ops/azure_monitoring_integration_plan.md`, `.specs/ops/operations_runbook.md`
+
+### D-038 대용량 처리 전략(`collect()` 제거)
+- 상태: **결정 필요(2026-02-11)**
+- 배경:
+  - A/B/C 런타임 경로에 driver `collect()` 사용이 다수 존재한다.
+  - 데이터 규모 증가 시 driver 메모리 병목/실패 가능성이 높다.
+- 영향:
+  - 실운영 확장 시 배치 실패율 상승 및 실행 시간 변동성 확대 리스크가 있다.
+- 결정 필요:
+  1) Spark DataFrame 기반 집계/조인으로 단계적 전환할지
+  2) 단기 완화로 row cap/샘플링/경고만 둘지
+  3) 전환 우선순위(A/B/C 중 어떤 경로부터 개선)와 완료 기준을 어떻게 둘지
+- 근거:
+  - 코드: `scripts/run_pipeline_a.py`, `scripts/run_pipeline_b.py`, `scripts/run_pipeline_c.py`
+  - 문서: `.specs/ops/performance_partitioning_checklist.md`
+
+### D-039 설정 SSOT 연결 + 하드코딩 제거
+- 상태: **결정 필요(2026-02-11)**
+- 배경:
+  - `configs/common.yaml`, `configs/dev.yaml`, `configs/prod.yaml`가 존재하지만 런타임 스크립트가 직접 소비하지 않는다.
+  - 운영 setup 스크립트에 catalog 하드코딩이 남아 있다.
+- 영향:
+  - 환경 전환(dev/prod) 시 설정 드리프트와 배포 실수 가능성이 증가한다.
+- 결정 필요:
+  1) 런타임 파라미터 SSOT를 `configs/*.yaml`로 일원화할지
+  2) Databricks job parameter 중심을 유지하고 설정 파일은 참고 문서로 한정할지
+  3) 하드코딩 제거 대상/순서를 어떤 기준으로 우선화할지
+- 근거:
+  - 코드: `configs/common.yaml`, `configs/dev.yaml`, `configs/prod.yaml`, `scripts/phase7/setup_minimal_cloud.sh`
+  - 문서: `.specs/cloud/cloud_migration_rebuild_plan.md`

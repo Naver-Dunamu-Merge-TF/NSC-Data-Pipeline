@@ -4,8 +4,10 @@ import argparse
 import json
 import os
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Callable, Sequence
 
 
 def _repo_root() -> Path:
@@ -168,6 +170,35 @@ def _collect_table(spark, table_fqn: str) -> list[dict]:
     return [row.asDict(recursive=True) for row in spark.table(table_fqn).collect()]
 
 
+@dataclass(frozen=True)
+class FailFastCheck:
+    table_name: str
+    valid_count: int
+    bad_count: int
+
+
+def persist_bad_records_and_enforce_fail_fast(
+    *,
+    bad_records: Sequence[dict[str, Any]],
+    persist_bad_records: Callable[[Sequence[dict[str, Any]]], None],
+    fail_fast_checks: Sequence[FailFastCheck],
+    rule,
+) -> dict[str, float]:
+    """Persist bad records first, then enforce bad-rate fail-fast checks."""
+
+    from src.transforms import silver_controls
+
+    persist_bad_records(bad_records)
+    bad_rates: dict[str, float] = {}
+    for check in fail_fast_checks:
+        bad_rates[check.table_name] = silver_controls.enforce_bad_records_rate(
+            valid_count=check.valid_count,
+            bad_count=check.bad_count,
+            rule=rule,
+        )
+    return bad_rates
+
+
 def _write_dbfs_status(payload: dict) -> None:
     """Write a small status blob for out-of-band debugging in Jobs runs.
 
@@ -290,6 +321,7 @@ def _drop_known_tables(spark, catalog: str) -> None:
             "order_events",
             "order_items",
             "products",
+            "bad_records",
             "dq_status",
         ),
         "gold": (
@@ -318,6 +350,7 @@ def main() -> None:
     from pyspark.sql import SparkSession
 
     from src.common.contracts import BRONZE_CONTRACTS, get_contract
+    from src.common.rules import select_rule
     from src.io.bronze_io import (
         bronze_short_name,
         default_batch_id,
@@ -420,21 +453,22 @@ def main() -> None:
     products_raw = _collect_table(spark, f"{catalog}.bronze.products_raw")
 
     status_lookup = silver_controls.build_status_lookup(payment_orders_raw)
+    bad_rate_rule = select_rule(rules, domain="silver", metric="bad_records_rate")
+    entry_type_rule = select_rule(rules, domain="silver", metric="entry_type_allowed")
+    status_rule = select_rule(rules, domain="silver", metric="payment_status_allowed")
 
-    wallet_result, wallet_bad_rate = (
-        silver_controls.transform_wallet_snapshot_with_rules(
-            wallet_raw,
-            run_id=run_id,
-            rules=rules,
-        )
+    wallet_result = silver_controls.transform_wallet_snapshot_records(
+        wallet_raw,
+        run_id=run_id,
+        rule_id=bad_rate_rule.rule_id if bad_rate_rule else None,
     )
-    ledger_result, ledger_bad_rate = (
-        silver_controls.transform_ledger_entries_with_rules(
-            ledger_raw,
-            run_id=run_id,
-            rules=rules,
-            status_lookup=status_lookup,
-        )
+    ledger_result = silver_controls.transform_ledger_entries_records(
+        ledger_raw,
+        run_id=run_id,
+        rule_id=entry_type_rule.rule_id if entry_type_rule else None,
+        allowed_entry_types=silver_controls.resolve_allowed_values(entry_type_rule),
+        allowed_statuses=silver_controls.resolve_allowed_values(status_rule),
+        status_lookup=status_lookup,
     )
     order_events_result = analytics.transform_order_events_records(
         orders_raw,
@@ -451,14 +485,60 @@ def main() -> None:
     )
 
     silver_outputs = (
-        ("silver.wallet_snapshot", wallet_result, wallet_bad_rate),
-        ("silver.ledger_entries", ledger_result, ledger_bad_rate),
-        ("silver.order_events", order_events_result, None),
-        ("silver.order_items", order_items_result, None),
-        ("silver.products", products_result, None),
+        ("silver.wallet_snapshot", wallet_result),
+        ("silver.ledger_entries", ledger_result),
+        ("silver.order_events", order_events_result),
+        ("silver.order_items", order_items_result),
+        ("silver.products", products_result),
     )
 
-    for table_name, result, bad_rate in silver_outputs:
+    all_bad_records: list[dict[str, Any]] = []
+    for _, result in silver_outputs:
+        all_bad_records.extend(result.bad_records)
+
+    bad_contract = get_contract("silver.bad_records")
+    bad_table_fqn = f"{catalog}.silver.bad_records"
+
+    def _persist_bad_records(records: Sequence[dict[str, Any]]) -> None:
+        _set_status("silver_bad_records_write", table=bad_table_fqn, rows=len(records))
+        if not records:
+            _set_status("silver_bad_records_written", table=bad_table_fqn, rows=0)
+            return
+        bad_df = _align_to_contract(
+            spark.createDataFrame(records, schema=_contract_schema(bad_contract)),
+            bad_contract,
+        )
+        bad_df.createOrReplaceTempView("_tmp_bad_records")
+        spark.sql(f"INSERT INTO {bad_table_fqn} SELECT * FROM _tmp_bad_records")
+        _set_status(
+            "silver_bad_records_written", table=bad_table_fqn, rows=len(records)
+        )
+
+    _set_status("silver_bad_records_persist_then_failfast", table=bad_table_fqn)
+    bad_rate_by_table = persist_bad_records_and_enforce_fail_fast(
+        bad_records=all_bad_records,
+        persist_bad_records=_persist_bad_records,
+        fail_fast_checks=(
+            FailFastCheck(
+                table_name="silver.wallet_snapshot",
+                valid_count=len(wallet_result.records),
+                bad_count=len(wallet_result.bad_records),
+            ),
+            FailFastCheck(
+                table_name="silver.ledger_entries",
+                valid_count=len(ledger_result.records),
+                bad_count=len(ledger_result.bad_records),
+            ),
+        ),
+        rule=bad_rate_rule,
+    )
+    _set_status(
+        "silver_failfast_passed",
+        wallet_bad_rate=bad_rate_by_table.get("silver.wallet_snapshot"),
+        ledger_bad_rate=bad_rate_by_table.get("silver.ledger_entries"),
+    )
+
+    for table_name, result in silver_outputs:
         contract = get_contract(table_name)
         if result.records:
             df = _align_to_contract(
@@ -476,6 +556,7 @@ def main() -> None:
             view_name = f"_tmp_{short_name}"
             df.createOrReplaceTempView(view_name)
             spark.sql(f"INSERT INTO {table_fqn} SELECT * FROM {view_name}")
+        bad_rate = bad_rate_by_table.get(table_name)
         extra = f", bad_rate={bad_rate:.4f}" if bad_rate is not None else ""
         print(
             f"silver: wrote {len(result.records)} rows"

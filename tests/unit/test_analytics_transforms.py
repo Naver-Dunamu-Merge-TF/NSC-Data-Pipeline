@@ -53,6 +53,9 @@ def test_transform_order_items_records_validates_required_keys() -> None:
     assert len(result.records) == 1
     assert len(result.bad_records) == 1
     assert result.records[0]["order_ref"] == "101"
+    bad_record = result.bad_records[0]
+    assert "detected_date_kst" in bad_record
+    assert isinstance(bad_record["detected_date_kst"], date)
 
 
 def test_transform_products_records_parses_decimal() -> None:

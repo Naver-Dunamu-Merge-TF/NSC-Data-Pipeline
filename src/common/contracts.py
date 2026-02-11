@@ -193,6 +193,19 @@ SILVER_CONTRACTS: dict[str, TableContract] = {
         ),
         description="Product dimension for analytics.",
     ),
+    "silver.bad_records": TableContract(
+        name="silver.bad_records",
+        columns=(
+            ContractColumn("detected_date_kst", "date", True),
+            ContractColumn("source_table", "string", True),
+            ContractColumn("reason", "string", True),
+            ContractColumn("record_json", "string", True),
+            ContractColumn("run_id", "string", True),
+            ContractColumn("rule_id", "string", False),
+            ContractColumn("detected_at", "timestamp", True),
+        ),
+        description="Quarantined bad records from silver transforms.",
+    ),
     "silver.dq_status": TableContract(
         name="silver.dq_status",
         columns=(

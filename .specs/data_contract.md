@@ -373,7 +373,7 @@ Databricks에서 일일 대사(Δ잔고 = 순흐름)를 하기 위해서는 아�
 - `amount = cast(amount as decimal(38,2))`
 - `amount_signed` 파생:
   - 업스트림 제공이 없으면 `entry_type(type)` 기반 룰 매핑으로 파생
-  - 룰로 매핑 불가(unknown type) 또는 부호 결정 불가 시 → `silver.bad_records_ledger_entries` 격리
+  - 룰로 매핑 불가(unknown type) 또는 부호 결정 불가 시 → `silver.bad_records`에 격리
 - `related_id`는 문자열 표준
   - `orders.order_id(BIGINT)`는 `cast(order_id as string)`로 맞춘다.
 
@@ -433,7 +433,9 @@ Databricks에서 일일 대사(Δ잔고 = 순흐름)를 하기 위해서는 아�
 
 ## 6) 격리/Fail-fast(Quarantine)
 
-- Silver 계약 위반 레코드는 `silver.bad_records_*`로 격리한다.
+- Silver 계약 위반 레코드는 `silver.bad_records`로 격리한다.
+- `silver.bad_records`는 단일 통합 테이블로 운영하며, 권장 컬럼은
+  `detected_date_kst`, `source_table`, `reason`, `record_json`, `run_id`, `rule_id`, `detected_at`다.
 - fail-fast 임계치(예: bad_records_rate)는 `gold.dim_rule_scd2`에서 관리한다.
 - 예외/알림은 `gold.exception_ledger`에 기록한다(단일 테이블 원칙).
 

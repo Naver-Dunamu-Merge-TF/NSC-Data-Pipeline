@@ -48,6 +48,10 @@ def test_transform_wallet_snapshot_records_invalid_balance() -> None:
     result = silver_controls.transform_wallet_snapshot_records(records, run_id="run-1")
     assert len(result.records) == 0
     assert len(result.bad_records) == 1
+    bad_record = result.bad_records[0]
+    assert "detected_date_kst" in bad_record
+    assert isinstance(bad_record["detected_date_kst"], date)
+    assert bad_record["detected_at"].tzinfo is not None
 
 
 def test_transform_ledger_entries_records_invalid_entry_type() -> None:
