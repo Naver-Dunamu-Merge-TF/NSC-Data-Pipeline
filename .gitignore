@@ -213,3 +213,5 @@ __marimo__/
 .agents/logs/**/*.txt
 
 .env/
+spark-warehouse/
+.agents/logs/verification/
