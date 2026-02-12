@@ -38,14 +38,23 @@ Last updated: 2026-02-12
 - `rule_load_mode` (A/B/Silver): `strict | fallback`
 
 운영 기본값(D-035):
-- B/C/Silver는 윈도우 파라미터가 비어 있으면 `전일(KST) 1일 backfill`로 자동 해석한다.
+- B/C/Silver는 `run_mode/start_ts/end_ts/date_kst_start/date_kst_end`가 모두 공백이면 `전일(KST) 1일 backfill`로 자동 해석한다.
 - B/C는 `pipeline_silver`의 `last_processed_end`가 대상 윈도우를 충족하지 못하면 fail-closed로 즉시 실패한다.
+
+운영 기본값(D-042):
+- A는 `run_mode`가 공백/`incremental`이고 `start_ts/end_ts/date_kst_start/date_kst_end`가 모두 공백이면 자동 incremental 윈도우를 해석한다.
+  - `end_ts = now_utc`
+  - `start_ts = pipeline_a.last_processed_end` (존재 시), 없거나 역전이면 `end_ts - 10분`
 
 Pipeline B task 구성:
 - `pipeline_b_recon`
 - `pipeline_b_supply_ops`
 - `pipeline_b_finalize_success` (둘 다 성공 시 state 갱신)
 - `pipeline_b_finalize_failure` (`AT_LEAST_ONE_FAILED` 시 state 갱신)
+
+운영/지원(On-demand) jobs:
+- `bootstrap_catalog` (운영 bootstrap: schema/table 생성/검증, 데이터 적재 제외)
+- `sync_dim_rule_scd2` (룰 테이블 반영)
 
 ## 3. Monitoring Model (Azure Monitoring v1)
 
@@ -198,9 +207,10 @@ databricks bundle run pipeline_b_controls -t dev \
 
 점검:
 1. `gold.pipeline_state`에서 `pipeline_silver.last_processed_end`가 대상 윈도우 이상인지 확인
-2. Secret Scope/Key (`ledger-analytics-dev/salt_user_key`) 접근 여부 확인
+2. Secret Scope/Key (`configs/{env}.yaml`의 `analytics.secret_scope`/`analytics.secret_key`) 접근 여부 확인
 3. Databricks 런타임에서는 salt 해석 실패 시 fail-closed(로컬 더미 fallback 불가)
 4. `silver.order_events/order_items/products` 조인 키 및 대상 `event_date_kst` 데이터 확인
+5. category 파생 조인은 `order_ref`만 사용(`order_id` fallback 없음), 동률 시 tie-break(`item_id`, `product_id`, `category`) 규칙 확인
 
 재실행 예시:
 ```bash
@@ -260,6 +270,12 @@ WHERE detected_date_kst < date_sub(current_date(), 180);
 ```
 
 ### 7.2 `gold.dim_rule_scd2` 변경 거버넌스 (SSOT)
+
+원칙:
+- 런타임 룰 SSOT는 `gold.dim_rule_scd2`다.
+- seed 파일(`mock_data/fixtures/dim_rule_scd2.json`)은 sync job 입력 아티팩트이며, 운영 판정은 table 기준으로 수행한다.
+- prod 문맥(`PIPELINE_ENV=prod` 또는 prod catalog 판별)에서는 `rule_load_mode=strict`만 허용된다.
+- dev/test는 `fallback` 허용하되 table 미존재/접근 실패에서만 seed fallback을 사용한다(테이블 payload 무결성 오류는 fail-fast).
 
 역할:
 - Owner: 데이터 오너(룰 변경 요청/근거 작성)

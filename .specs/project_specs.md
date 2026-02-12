@@ -35,14 +35,24 @@ Last updated: 2026-02-12
 - `silver.bad_records` 영속화 구현
   - 운영 경로: `run_pipeline_silver`에서 `append-only` 적재
   - fail-fast: `wallet_snapshot`/`ledger_entries` bad rate 임계치 초과 시 실패 처리
+  - 보존 정책: 180일 + 월 1회 cleanup workflow(`bad_records_retention_cleanup`, KST 00:50)
 - 운영 Silver 물질화 경로 구현 (`run_pipeline_silver`, `pipeline_silver_materialization`)
   - B/C는 `pipeline_silver` 체크포인트 기반 fail-closed dependency 적용
   - B/C/Silver는 빈 윈도우 파라미터 시 `전일(KST) 1일 backfill` 기본 해석
   - `e2e_full_pipeline` 의존 그래프: `sync_dim_rule_scd2 -> pipeline_a -> pipeline_silver -> pipeline_b/pipeline_c`
+- 운영 카탈로그 부트스트랩 경로 구현 (D-034)
+  - `bootstrap_catalog` job + `scripts/bootstrap_catalog.py` (`--catalog` 필수, `--dry-run` 지원)
+  - 범위: UC schema/table 생성 및 존재 검증(데이터 적재 제외)
 - `gold.dim_rule_scd2` 테이블 기반 룰 로딩 구현
   - Pipeline A/B/Silver: `--rule-load-mode` 기반(`strict|fallback`)
   - 룰 반영 경로: `sync_dim_rule_scd2` 전용 job
   - 운영 기본 정책: prod `strict`, dev/test `fallback`
+- Spark-only 런타임 경로 정리 (D-038)
+  - A/B/C/Silver 런타임은 direct `collect()` 대신 bounded `safe_collect(max_rows=...)`만 허용
+  - `databricks.yml`에서 `engine_mode` 변수/파라미터/CLI 전달 인자 제거
+- 설정 SSOT 적용 및 하드코딩 제거 (D-039)
+  - A/B/C/Silver `--catalog`, C의 `--secret-scope/--secret-key` 기본값을 `configs/*.yaml` 기반으로 해석
+  - `PIPELINE_CFG__<NESTED__KEY>` env override 지원(unknown key fail-fast, bool/null/number 파싱)
 
 ### 0.2 Planned / Backlog (미구현 또는 확정 전)
 
@@ -171,7 +181,7 @@ Planned:
 - `incremental`: `start_ts/end_ts` 필수
 - `backfill`: `date_kst_start/end` 또는 `start_ts/end_ts`로 날짜 범위 해석 필수
 - 운영 기본값(D-042): A에서 `run_mode`가 공백/`incremental`이고 윈도우 파라미터가 모두 공백이면 자동 incremental 윈도우(`start_ts=last_processed_end|now-10m`, `end_ts=now`)를 해석한다.
-- 운영 기본값(D-035): B/C/Silver에서 윈도우 파라미터가 공백이면 `run_mode=backfill`, `date_kst_start=end=전일(KST)`로 자동 해석
+- 운영 기본값(D-035): B/C/Silver에서 `run_mode/start_ts/end_ts/date_kst_start/date_kst_end`가 모두 공백이면 `run_mode=backfill`, `date_kst_start=end=전일(KST)`로 자동 해석
 
 ### 3.4 운영 Workflow 인벤토리
 
@@ -254,6 +264,7 @@ Planned:
 핵심 규칙:
 
 - `silver.order_events` 중 `order_source = PAYMENT_ORDERS`만 적재 (D-012)
+- `category` 파생 조인키는 `order_ref`만 사용 (`order_id` fallback 금지, D-041)
 - `category`는 대표 아이템(line_amount 최대) 기준
   - 동률 처리: `item_id` 최소 우선, 추가 tie-break로 `product_id`, `category` 오름차순 적용 (D-011, D-041)
 - `user_key = sha256(user_id + salt)`
@@ -295,7 +306,7 @@ Planned:
   - prod: `strict`
   - dev/test: `fallback`
 - prod 가드레일:
-  - prod 문맥(`PIPELINE_ENV=prod` 또는 prod catalog 판별)에서 `rule_load_mode != strict`는 즉시 차단한다.
+  - prod 문맥(`PIPELINE_ENV=prod` 또는 `catalog=prod_catalog` 또는 `catalog == configs/prod.yaml.databricks.catalog`)에서 `rule_load_mode != strict`는 즉시 차단한다.
 
 ### 5.3 주요 결정 연계
 
@@ -303,7 +314,12 @@ Planned:
 - D-019: salt 해석 우선순위
 - D-020: `pipeline_state` 성공/실패 갱신 규칙
 - D-033: `silver.bad_records` 영속화 방식
+- D-034: 운영 부트스트랩(schema/table) 정책
+- D-036: 룰 SSOT `gold.dim_rule_scd2` + prod strict 가드
+- D-038: Spark-only 전환 + bounded collect 정책
+- D-039: `configs/*.yaml` 런타임 SSOT + env override
 - D-040: `gold.exception_ledger` MERGE key 확장 + 동일 `run_id` 재실행 수렴 기준
+- D-041: Pipeline C category 조인키/동률 tie-break 정책
 - D-042: Pipeline A 빈 윈도우 파라미터 자동 incremental 해석
 
 ---
@@ -437,7 +453,7 @@ Planned:
 
 ## 12) 즉시 후속 정합화 항목
 
-1. D-035 완료: `run_pipeline_silver` 운영 경로 + B/C fail-closed dependency 적용
+1. 운영 증적 축적: `bootstrap_catalog`/`bad_records_retention_cleanup` 정기 실행 로그를 기준선으로 누적
 2. 룰 변경 거버넌스(runbook 절차) 운영 증적 축적 및 정기 점검
 3. `data_contract.md`와 `project_specs.md`의 Current/Planned 표기를 동일 기준으로 유지
 4. v2 모니터링 확장 준비(테이블 기반 알림: `dq_status`, `exception_ledger`, `pipeline_state`, stale/drop 억제)

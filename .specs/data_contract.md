@@ -1,10 +1,23 @@
-# 데이터 컨트랙트: Ledger Controls & Analytics (v1.0)
+# 데이터 컨트랙트: Ledger Controls & Analytics (v1.1)
 
-> **SSOT(요구사항)**: `.specs/SRS - Software Requirements Specification.md` (v1.1, 2026-01-30)  
-> **SSOT(스키마 맥락)**: `.specs/database_schema`  
+> **SSOT(요구사항)**: `.ref/SRS - Software Requirements Specification.md` (v1.1, 2026-01-30)  
+> **SSOT(스키마 맥락)**: `.ref/database_schema`  
 > **연계 문서**: `.specs/project_specs.md` (Databricks 스펙/파이프라인)  
-> **Last Updated**: 2026-02-11  
+> **Last Updated**: 2026-02-12  
 > **범위**: SRS 2.3(원장 및 관리자), 2.4(Analytics - OLAP)
+
+---
+
+## 문서 상태 (Current / Planned)
+
+### Current (구현됨)
+
+- Silver: `silver.wallet_snapshot`, `silver.ledger_entries`, `silver.order_events`, `silver.order_items`, `silver.products`, `silver.bad_records`, `silver.dq_status`
+- Gold: `gold.recon_daily_snapshot_flow`, `gold.ledger_supply_balance_daily`, `gold.fact_payment_anonymized`, `gold.admin_tx_search`, `gold.ops_payment_failure_daily`, `gold.ops_payment_refund_daily`, `gold.ops_ledger_pairing_quality_daily`, `gold.exception_ledger`, `gold.pipeline_state`, `gold.dim_rule_scd2`
+
+### Planned / Backlog
+
+- `gold.fact_market_price` (FR-ANA-02)
 
 ---
 
@@ -24,11 +37,11 @@ Databricks에서 다음을 안정적으로 수행하기 위한 **최소 데이�
 - Freeze/Settle/Rollback 등 **트랜잭션 처리**
 - ACID 보장(원장 원자성/격리성)
 - 실시간(≤500ms) 조회 API 제공
-- FR-ADM-02의 **초단위 `tx_id` 단건 조회(Serving)**: Backoffice DB + Admin API(상세: `.specs/backoffice_db_admin_api.md`, 본 문서는 Lakehouse 배치 인덱스만 정의)
+- FR-ADM-02의 **초단위 `tx_id` 단건 조회(Serving)**: Backoffice DB + Admin API(상세: `.ref/backoffice_db_admin_api.md`, 본 문서는 Lakehouse 배치 인덱스만 정의)
 
 ### 0.3 현재 소스(스키마 스냅샷 기준)
 
-> 실제 운영 DB명/스키마명은 환경 설정으로 주입하며, 컬럼 명세는 `.specs/database_schema`를 기준으로 한다.
+> 실제 운영 DB명/스키마명은 환경 설정으로 주입하며, 컬럼 명세는 `.ref/database_schema`를 기준으로 한다.
 
 - 지갑: `user_wallets`
 - 원장 이벤트: `transaction_ledger`
@@ -76,6 +89,28 @@ Databricks에서 다음을 안정적으로 수행하기 위한 **최소 데이�
 ## 2) 소스 계약(OLTP → Bronze)
 
 > Bronze는 원본 보존 목적이며, Silver에서 계약을 강제한다.
+
+### 2.0 Bronze Raw 표준(현재 운영 계약)
+
+**Bronze Raw 테이블**
+
+| Bronze 테이블 | 원본 소스 | 비고 |
+|---|---|---|
+| `bronze.user_wallets_raw` | `user_wallets` | 지갑 스냅샷 원본 |
+| `bronze.transaction_ledger_raw` | `transaction_ledger` | 원장 이벤트 원본 |
+| `bronze.payment_orders_raw` | `payment_orders` | 결제 오더 원본 |
+| `bronze.orders_raw` | `orders` | 커머스 주문 원본 |
+| `bronze.order_items_raw` | `order_items` | 커머스 아이템 원본 |
+| `bronze.products_raw` | `products` | 상품 마스터 원본 |
+
+**공통 메타 컬럼(6개 Raw 공통)**
+
+| 컬럼 | 타입(권장) | 필수 | 의미 |
+|---|---|---:|---|
+| `ingested_at` | `timestamp` | ⭕️ | Bronze 적재 시각(UTC) |
+| `source_extracted_at` | `timestamp` | ⭕️ | 소스 추출 시각(UTC) |
+| `batch_id` | `string` | ⭕️ | 배치 식별자 |
+| `source_system` | `string` | ⭕️ | 소스 시스템 식별자 |
 
 ### 2.1 `user_wallets` (지갑 상태)
 
@@ -266,6 +301,29 @@ Databricks에서 일일 대사(Δ잔고 = 순흐름)를 하기 위해서는 아�
 | `is_display` | `boolean` | ⭕️ | 노출 여부 |
 | `run_id` | `string` | ✅ | 실행 추적 |
 
+### 3.5 `silver.dq_status` (Guardrail DQ 상태)
+
+| 컬럼 | 타입(권장) | 필수 | 의미 |
+|---|---|---:|---|
+| `source_table` | `string` | ✅ | 점검 대상 소스 |
+| `window_start_ts` | `timestamp` | ✅ | 점검 윈도우 시작(UTC) |
+| `window_end_ts` | `timestamp` | ✅ | 점검 윈도우 종료(UTC) |
+| `date_kst` | `date` | ✅ | 윈도우 종료 시각 기준 KST 일자 |
+| `freshness_sec` | `bigint` | ⭕️ | 최신 데이터 지연 초 |
+| `event_count` | `bigint` | ✅ | 윈도우 이벤트 건수 |
+| `dup_rate` | `decimal(38,6)` | ⭕️ | 중복 비율 |
+| `bad_records_rate` | `decimal(38,6)` | ⭕️ | 계약 위반 비율 |
+| `dq_tag` | `string` | ⭕️ | 대표 상태 태그 |
+| `severity` | `string` | ⭕️ | 상태 심각도 |
+| `run_id` | `string` | ✅ | 실행 추적 |
+| `rule_id` | `string` | ⭕️ | 적용 룰 |
+| `generated_at` | `timestamp` | ✅ | 산출 시각(UTC) |
+
+**쓰기/파티션**
+
+- 쓰기 전략: append
+- 파티션: `date_kst`
+
 ---
 
 ## 4) Gold 계약(Silver → Gold)
@@ -289,7 +347,7 @@ Databricks에서 일일 대사(Δ잔고 = 순흐름)를 하기 위해서는 아�
 | 컬럼 | 타입(권장) | 필수 | 의미 |
 |---|---|---:|---|
 | `date_kst` | `date` | ✅ | 대상 일자 |
-| `issued_supply` | `decimal(38,2)` | ✅ | 발행량(정의/소스는 룰/설계로 고정) |
+| `issued_supply` | `decimal(38,2)` | ✅ | 누적 공급량(`event_date_kst <= date_kst`, `MINT/CHARGE` +, `BURN/WITHDRAW` -) |
 | `wallet_total_balance` | `decimal(38,2)` | ✅ | 지갑 잔액 합 |
 | `diff_amount` | `decimal(38,2)` | ✅ | `issued_supply - wallet_total_balance` |
 | `is_ok` | `boolean` | ✅ | diff 0 여부(임계치 룰 가능) |
@@ -308,10 +366,11 @@ Databricks에서 일일 대사(Δ잔고 = 순흐름)를 하기 위해서는 아�
 | `category` | `string` | ⭕️ | 상품 카테고리(가능 시) |
 | `run_id` | `string` | ✅ | 실행 추적 |
 
-### 4.4 (옵션) `gold.admin_tx_search` (tx_id 배치 인덱스)
+### 4.4 `gold.admin_tx_search` (tx_id 배치 인덱스)
 
 > 본 테이블은 “검색 편의/감사/분석” 목적의 **배치 인덱스**다.  
 > FR-ADM-02의 초단위 단건 조회는 Backoffice DB + Admin API가 SSOT이다.
+> 현재 운영 구현 범위에 포함되며, Serving API의 SSOT를 대체하지 않는다.
 
 | 컬럼 | 타입(권장) | 필수 | 의미 |
 |---|---|---:|---|
@@ -342,7 +401,23 @@ Databricks에서 일일 대사(Δ잔고 = 순흐름)를 하기 위해서는 아�
 | `run_id` | `string` | ✅ | 실행 추적 |
 | `rule_id` | `string` | ⭕️ | 적용 룰 |
 
-### 4.6 `gold.ops_ledger_pairing_quality_daily` (운영 지표: 원장 페어링 품질)
+### 4.6 `gold.ops_payment_refund_daily` (운영 지표: 결제 환불율)
+
+| 컬럼 | 타입(권장) | 필수 | 의미 |
+|---|---|---:|---|
+| `date_kst` | `date` | ✅ | 대상 일자 |
+| `merchant_name` | `string` | ⭕️ | 가맹점(없으면 NULL) |
+| `total_cnt` | `bigint` | ✅ | 결제 오더 총 건수 |
+| `refunded_cnt` | `bigint` | ✅ | 환불 건수(`REFUNDED`) |
+| `refund_rate` | `decimal(38,6)` | ✅ | `refunded_cnt / total_cnt` |
+| `run_id` | `string` | ✅ | 실행 추적 |
+| `rule_id` | `string` | ⭕️ | 적용 룰 |
+
+**키(멱등성)**
+
+- `(date_kst, merchant_name)` MERGE
+
+### 4.7 `gold.ops_ledger_pairing_quality_daily` (운영 지표: 원장 페어링 품질)
 
 > (방법2 가정) 결제 관련 엔트리는 서로 다른 `tx_id`를 가지며, `related_id`로 묶어서 페어링한다.
 
@@ -356,7 +431,7 @@ Databricks에서 일일 대사(Δ잔고 = 순흐름)를 하기 위해서는 아�
 | `run_id` | `string` | ✅ | 실행 추적 |
 | `rule_id` | `string` | ⭕️ | 적용 룰 |
 
-### 4.7 `gold.exception_ledger` (공통 예외 원장)
+### 4.8 `gold.exception_ledger` (공통 예외 원장)
 
 | 컬럼 | 타입(권장) | 필수 | 의미 |
 |---|---|---:|---|
@@ -380,7 +455,26 @@ Databricks에서 일일 대사(Δ잔고 = 순흐름)를 하기 위해서는 아�
 - Pipeline B: MERGE key = `(date_kst, domain, exception_type, run_id, metric, message)`
   (동일 `run_id` 재실행 허용, 동일 입력 기준 수렴)
 
-### 4.8 `gold.dim_rule_scd2` (룰 SSOT, SCD2)
+### 4.9 `gold.pipeline_state` (파이프라인 상태 SSOT)
+
+| 컬럼 | 타입(권장) | 필수 | 의미 |
+|---|---|---:|---|
+| `pipeline_name` | `string` | ✅ | 파이프라인 식별자(`pipeline_a/b/c/silver`) |
+| `last_success_ts` | `timestamp` | ⭕️ | 마지막 성공 시각(UTC) |
+| `last_processed_end` | `timestamp` | ⭕️ | 마지막 성공 실행의 처리 종료 시각(UTC) |
+| `last_run_id` | `string` | ⭕️ | 마지막 실행 ID(성공/실패 포함) |
+| `dq_zero_window_counts` | `string` | ⭕️ | 소스별 연속 0-window 카운트(JSON 문자열) |
+| `updated_at` | `timestamp` | ✅ | 상태 갱신 시각(UTC) |
+
+**키(멱등성)**
+
+- `(pipeline_name)` MERGE
+
+운영 규칙:
+- 성공 시 `last_success_ts`, `last_processed_end`, `last_run_id`, `updated_at`를 갱신한다.
+- 실패 시 `last_success_ts`, `last_processed_end`는 유지하고 `last_run_id`, `updated_at`만 갱신한다.
+
+### 4.10 `gold.dim_rule_scd2` (룰 SSOT, SCD2)
 
 | 컬럼 | 타입(권장) | 필수 | 의미 |
 |---|---|---:|---|
@@ -402,7 +496,7 @@ Databricks에서 일일 대사(Δ잔고 = 순흐름)를 하기 위해서는 아�
 
 ---
 
-## 5) 매핑 규칙(예시) — database_schema 기준
+## 5) 매핑 규칙(예시) — `.ref/database_schema` 기준
 
 ### 5.1 `user_wallets` → `silver.wallet_snapshot`
 
@@ -429,6 +523,8 @@ Databricks에서 일일 대사(Δ잔고 = 순흐름)를 하기 위해서는 아�
 |------------|---------------|------|------------|
 | CHARGE | +amount | KRW → NSC 충전 | 입금 참조 ID |
 | WITHDRAW | -amount | NSC → KRW 환전 | 출금 참조 ID |
+| MINT | +amount | 공급 증가 이벤트 | 공급 참조 ID |
+| BURN | -amount | 공급 소각 이벤트 | 소각 참조 ID |
 | PAYMENT | -amount | 결제 지출 (구매자) | 결제 오더 ID |
 | RECEIVE | +amount | 결제 수령 (판매자) | 결제 오더 ID |
 | REFUND_OUT | -amount | 환불 지급 (판매자) | 결제 오더 ID |
@@ -460,7 +556,13 @@ Databricks에서 일일 대사(Δ잔고 = 순흐름)를 하기 위해서는 아�
 - `failed_cnt`의 status 집합은 룰/합의로 고정(예: `FAILED`, `CANCELLED` 등)
 - `merchant_name` 단위로도 집계(없으면 NULL)
 
-### 5.6 `silver.ledger_entries` → `gold.ops_ledger_pairing_quality_daily`
+### 5.6 `payment_orders` → `gold.ops_payment_refund_daily`
+
+- 집계 기준: `date_kst`(KST day)
+- `refunded_cnt`는 `status = REFUNDED`만 집계한다.
+- 환불율은 실패율과 분리 산출한다(`gold.ops_payment_failure_daily`와 독립).
+
+### 5.7 `silver.ledger_entries` → `gold.ops_ledger_pairing_quality_daily`
 
 - 집계 기준: `date_kst`(= `event_date_kst`)
 - `related_id` 그룹핑 기반 품질 지표 산출
@@ -468,7 +570,7 @@ Databricks에서 일일 대사(Δ잔고 = 순흐름)를 하기 위해서는 아�
   - `pair_candidate_rate`: “그룹 크기 2 + 서로 다른 wallet_id” 비율(예시)
   - `join_payment_orders_rate`: `related_id`→`payment_orders.order_id` 조인 성공 비율(가능 시)
 
-### 5.7 (옵션) `silver.ledger_entries` → `gold.admin_tx_search`
+### 5.8 `silver.ledger_entries` → `gold.admin_tx_search`
 
 - 목적: tx_id 단건 조회를 위한 “배치 인덱스(감사/분석용)”
 - `paired_tx_id`는 `related_id` 그룹핑으로 추정 가능(정답 보장은 아님)
@@ -478,8 +580,8 @@ Databricks에서 일일 대사(Δ잔고 = 순흐름)를 하기 위해서는 아�
 ## 6) 격리/Fail-fast(Quarantine)
 
 - Silver 계약 위반 레코드는 `silver.bad_records`로 격리한다.
-- `silver.bad_records`는 단일 통합 테이블로 운영하며, 권장 컬럼은
-  `detected_date_kst`, `source_table`, `reason`, `record_json`, `run_id`, `rule_id`, `detected_at`다.
+- `silver.bad_records`는 단일 통합 테이블로 운영하며, 계약 컬럼은
+  `detected_date_kst`, `source_table`, `reason`, `record_json`, `run_id`, `rule_id`, `detected_at`로 고정한다.
 - fail-fast 임계치(예: bad_records_rate)는 `gold.dim_rule_scd2`에서 관리한다.
 - 예외/알림은 `gold.exception_ledger`에 기록한다(단일 테이블 원칙).
 
