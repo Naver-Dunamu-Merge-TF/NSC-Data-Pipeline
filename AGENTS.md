@@ -114,6 +114,8 @@ Verification policy
 
  -  Verification is mandatory. Do not claim completion without running an
     appropriate verification level.
+ -  Local pytest-based verification (L1/L2) must always run via the project
+    virtual environment interpreter (`.venv/bin/python -m pytest ...`).
  -  Store evidence under `.agents/logs/verification/`.
  -  Do not encode verification level in commit messages.
 
@@ -122,8 +124,8 @@ Verification policy
 | Level | When | Duration | Command | Pass Criteria |
 |-------|------|----------|---------|---------------|
 | L0 | Per edit | < 30s | `python -m py_compile` | No syntax errors |
-| L1 | Pre-commit | < 2min | `pytest tests/unit/ -x` | All unit tests pass |
-| L2 | Pre-PR | < 10min | `pytest --cov-fail-under=80` | 80%+ coverage |
+| L1 | Pre-commit | < 2min | `.venv/bin/python -m pytest tests/unit/ -x` | All unit tests pass |
+| L2 | Pre-PR | < 10min | `.venv/bin/python -m pytest tests/unit/ tests/integration/ --cov=src --cov-fail-under=80` | 80%+ coverage |
 | L3 | Pre-merge | < 30min | Databricks Dev E2E | Idempotency verified |
 
 ### L3 execution standard
@@ -147,8 +149,8 @@ Verification policy
 ### Toolbox
 
  -  L0: `python -m py_compile ${FILE}`
- -  L1: `pytest tests/unit/ -v -x`
- -  L2: `pytest tests/unit/ tests/integration/ -v --cov=src --cov-fail-under=80`
+ -  L1: `.venv/bin/python -m pytest tests/unit/ -v -x`
+ -  L2: `.venv/bin/python -m pytest tests/unit/ tests/integration/ -v --cov=src --cov-fail-under=80`
  -  L3: `databricks jobs run-now --job-id ${JOB_ID}`
 
 

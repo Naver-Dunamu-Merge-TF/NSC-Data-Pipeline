@@ -348,11 +348,13 @@ Planned:
 - Unit: `tests/unit/`
 - Integration: `tests/integration/`
 - E2E skeleton: `tests/e2e/`
+- 로컬 테스트 실행 원칙: 프로젝트 가상환경 기준으로
+  `.venv/bin/python -m pytest ...`를 사용한다.
 
 ### 9.2 CI 게이트 (Current)
 
-- Unit coverage gate: `pytest tests/unit/ --cov=src --cov-fail-under=80`
-- Integration smoke: `pytest tests/integration/ --cov=src --cov-fail-under=60`
+- Unit coverage gate: `.venv/bin/python -m pytest tests/unit/ --cov=src --cov-fail-under=80`
+- Integration smoke: `.venv/bin/python -m pytest tests/integration/ --cov=src --cov-fail-under=60`
 
 근거: `.github/workflows/ci.yml`
 

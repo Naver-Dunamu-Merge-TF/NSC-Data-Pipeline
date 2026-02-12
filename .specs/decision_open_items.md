@@ -242,6 +242,10 @@
 - 근거:
   - 문서: `.specs/project_specs.md`, `.specs/data_contract.md`, `.specs/ops/operations_runbook.md`
   - 코드: `src/common/contracts.py`, `src/common/table_metadata.py`, `src/transforms/silver_controls.py`, `src/transforms/analytics.py`, `scripts/e2e/setup_e2e_env.py`
+- 구현(2026-02-12, 운영 정리 자동화):
+  1) 운영 정리 스크립트 `scripts/ops/cleanup_bad_records.py`를 추가했다.
+  2) Databricks Workflow `bad_records_retention_cleanup`(월 1회, KST 00:50)를 `databricks.yml`에 추가했다.
+  3) runbook 정리 절차를 scheduled job 기본 + 수동 SQL fallback으로 정렬했다.
 
 ### D-034 운영 부트스트랩(UC schema/table) 정책
 - 상태: **결정됨**
@@ -309,6 +313,10 @@
 - 근거:
   - 코드: `src/io/rule_loader.py`, `scripts/run_pipeline_a.py`, `scripts/run_pipeline_b.py`, `scripts/run_pipeline_silver.py`, `scripts/sync_dim_rule_scd2.py`, `databricks.yml`
   - 문서: `.specs/project_specs.md`, `.specs/data_contract.md`, `.specs/ops/operations_runbook.md`
+- 구현 보강(2026-02-12, prod fail-closed 강제):
+  1) `src/common/rule_mode_guard.py`를 추가했다.
+  2) `run_pipeline_a.py`, `run_pipeline_b.py`, `run_pipeline_silver.py`에서 prod 문맥 + `rule_load_mode != strict`를 즉시 차단한다.
+  3) prod 판별 우선순위를 `PIPELINE_ENV=prod -> catalog=prod_catalog -> configs/prod.yaml catalog 일치`로 고정했다.
 
 ### D-037 모니터링 SSOT 충돌 해소
 - 상태: **결정됨(2026-02-11)**
@@ -369,6 +377,11 @@
 - 근거:
   - 코드: `src/common/config_loader.py`, `configs/common.yaml`, `configs/dev.yaml`, `configs/prod.yaml`
   - 문서: `.specs/cloud/cloud_migration_rebuild_plan.md`
+- 구현 보강(2026-02-12, env override 레이어 연결):
+  1) `PIPELINE_CFG__<NESTED__KEY>` 형식 env override를 `config_loader`에 추가했다.
+  2) 적용 우선순위를 `CLI args > env vars > configs/{env}.yaml > configs/common.yaml`로 코드에 반영했다.
+  3) unknown key override는 fail-fast(`KeyError`), 값 파싱은 `true/false/null/숫자` 강제 변환으로 고정했다.
+  4) `src/io/secret_loader.py`의 secret scope/key 기본값을 설정 기반으로만 해석하도록 정리했다.
 
 ### D-040 `gold.exception_ledger` 멱등성 충돌(재실행 시 MERGE 실패)
 - 상태: **결정됨(2026-02-11)**
