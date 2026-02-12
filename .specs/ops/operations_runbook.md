@@ -1,6 +1,6 @@
 # Operations Runbook (Pipeline A/Silver/B/C)
 
-Last updated: 2026-02-11
+Last updated: 2026-02-12
 
 ## 1. Scope
 
@@ -33,7 +33,7 @@ Last updated: 2026-02-11
 - `start_ts`, `end_ts` (UTC window)
 - `date_kst_start`, `date_kst_end` (backfill day window)
 - `run_id`
-- `engine_mode`: `legacy | spark` (D-038 단계 전환 중, 현재 기본 `legacy`)
+- D-038 이후 런타임 엔진은 spark-only로 고정한다(`engine_mode` 파라미터 제거).
 - `rule_load_mode` (A/B/Silver): `strict | fallback`
 
 운영 기본값(D-035):

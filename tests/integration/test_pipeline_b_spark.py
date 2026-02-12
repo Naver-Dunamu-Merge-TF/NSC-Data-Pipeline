@@ -12,28 +12,19 @@ if shutil.which("java") is None:
 
 from pyspark.sql import SparkSession  # noqa: E402
 
-from src.common.time_utils import UTC, to_utc  # noqa: E402
+from src.common.time_utils import UTC  # noqa: E402
 from src.io.rule_loader import load_default_rule_seed  # noqa: E402
 from src.jobs.pipeline_b_spark import transform_pipeline_b_tables_spark  # noqa: E402
-from src.transforms.ledger_controls import (  # noqa: E402
-    build_admin_tx_search,
-    build_ops_ledger_pairing_quality_daily,
-    build_ops_payment_failure_daily,
-    build_ops_payment_refund_daily,
-    build_recon_snapshot_flow,
-    build_supply_balance_daily,
-)
 
-RUN_ID = "run-pipeline-b-spark-parity"
+RUN_ID = "run-pipeline-b-spark"
 TARGET_DATES = [date(2026, 2, 1), date(2026, 2, 2)]
-LOCAL_TZ = datetime.now().astimezone().tzinfo
 
 
 @pytest.fixture(scope="module")
 def spark():
     session = (
         SparkSession.builder.master("local[1]")
-        .appName("pipeline-b-spark-parity")
+        .appName("pipeline-b-spark")
         .config("spark.sql.session.timeZone", "UTC")
         .getOrCreate()
     )
@@ -233,232 +224,95 @@ def _scenario():
     ]
 
     dq_status = [
-        {
-            "date_kst": date(2026, 2, 1),
-            "dq_tag": "EVENT_DROP_SUSPECTED",
-        },
-        {
-            "date_kst": date(2026, 2, 1),
-            "dq_tag": "SOURCE_STALE",
-        },
-        {
-            "date_kst": date(2026, 2, 2),
-            "dq_tag": "EVENT_DROP_SUSPECTED",
-        },
+        {"date_kst": date(2026, 2, 1), "dq_tag": "EVENT_DROP_SUSPECTED"},
+        {"date_kst": date(2026, 2, 1), "dq_tag": "SOURCE_STALE"},
+        {"date_kst": date(2026, 2, 2), "dq_tag": "EVENT_DROP_SUSPECTED"},
     ]
 
     return wallet_snapshots, ledger_entries, payment_orders, dq_status
 
 
-def _canonical_value(value):
-    if isinstance(value, datetime):
-        normalized = (
-            value if value.tzinfo is not None else value.replace(tzinfo=LOCAL_TZ or UTC)
-        )
-        return to_utc(normalized).isoformat()
-    if isinstance(value, date):
-        return value.isoformat()
-    if isinstance(value, Decimal):
-        return value
-    return value
-
-
-def _sort_key(row: dict, keys: tuple[str, ...]) -> tuple[str, ...]:
-    return tuple("" if row.get(key) is None else str(row.get(key)) for key in keys)
-
-
-def _canonical_rows(rows: list[dict], *, sort_keys: tuple[str, ...]) -> list[dict]:
-    normalized = [
-        {column: _canonical_value(value) for column, value in row.items()}
-        for row in rows
-    ]
-    return sorted(normalized, key=lambda row: _sort_key(row, sort_keys))
-
-
-def _run_legacy(
-    *,
-    wallet_snapshots: list[dict],
-    ledger_entries: list[dict],
-    payment_orders: list[dict],
-    dq_status: list[dict],
-):
-    rules = load_default_rule_seed()
-    dq_tags_by_date: dict[date, list[str]] = {}
-    for row in dq_status:
-        if row.get("date_kst") and row.get("dq_tag"):
-            dq_tags_by_date.setdefault(row["date_kst"], []).append(str(row["dq_tag"]))
-
-    recon_rows: list[dict] = []
-    supply_rows: list[dict] = []
-    ops_failure_rows: list[dict] = []
-    ops_refund_rows: list[dict] = []
-    pairing_rows: list[dict] = []
-    admin_rows: list[dict] = []
-    exception_rows: list[dict] = []
-
-    for target_date in TARGET_DATES:
-        dq_tags = dq_tags_by_date.get(target_date)
-        recon_output = build_recon_snapshot_flow(
-            wallet_snapshots,
-            ledger_entries,
-            target_date=target_date,
-            run_id=RUN_ID,
-            rules=rules,
-            dq_tags=dq_tags,
-        )
-        recon_rows.extend(recon_output.rows)
-        exception_rows.extend(recon_output.exceptions)
-
-        supply_output = build_supply_balance_daily(
-            wallet_snapshots,
-            ledger_entries,
-            target_date=target_date,
-            run_id=RUN_ID,
-            rules=rules,
-            dq_tags=dq_tags,
-        )
-        supply_rows.append(supply_output.row)
-        exception_rows.extend(supply_output.exceptions)
-
-        ops_failure_rows.extend(
-            build_ops_payment_failure_daily(
-                payment_orders,
-                target_date=target_date,
-                run_id=RUN_ID,
-            )
-        )
-        ops_refund_rows.extend(
-            build_ops_payment_refund_daily(
-                payment_orders,
-                target_date=target_date,
-                run_id=RUN_ID,
-            )
-        )
-        pairing_rows.append(
-            build_ops_ledger_pairing_quality_daily(
-                ledger_entries,
-                target_date=target_date,
-                run_id=RUN_ID,
-                payment_orders=payment_orders,
-            )
-        )
-        admin_rows.extend(
-            build_admin_tx_search(
-                ledger_entries,
-                target_date=target_date,
-                run_id=RUN_ID,
-            )
-        )
-
-    return {
-        "recon_rows": recon_rows,
-        "supply_rows": supply_rows,
-        "ops_failure_rows": ops_failure_rows,
-        "ops_refund_rows": ops_refund_rows,
-        "pairing_rows": pairing_rows,
-        "admin_rows": admin_rows,
-        "exception_rows": exception_rows,
-        "rules": rules,
-    }
-
-
-def test_pipeline_b_spark_parity_two_day_mixed(spark) -> None:
+def test_pipeline_b_spark_expected_outputs_two_days(spark) -> None:
     wallet_snapshots, ledger_entries, payment_orders, dq_status = _scenario()
 
-    legacy = _run_legacy(
-        wallet_snapshots=wallet_snapshots,
-        ledger_entries=ledger_entries,
-        payment_orders=payment_orders,
-        dq_status=dq_status,
-    )
-    spark_output = transform_pipeline_b_tables_spark(
+    output = transform_pipeline_b_tables_spark(
         wallet_snapshot_df=spark.createDataFrame(wallet_snapshots),
         ledger_entries_df=spark.createDataFrame(ledger_entries),
         payment_orders_df=spark.createDataFrame(payment_orders),
         dq_status_df=spark.createDataFrame(dq_status),
         target_dates=TARGET_DATES,
         run_id=RUN_ID,
-        rules=legacy["rules"],
+        rules=load_default_rule_seed(),
         run_recon=True,
         run_supply_ops=True,
     )
 
-    assert spark_output.recon_df is not None
-    assert spark_output.supply_df is not None
-    assert spark_output.ops_failure_df is not None
-    assert spark_output.ops_refund_df is not None
-    assert spark_output.pairing_quality_df is not None
-    assert spark_output.admin_tx_search_df is not None
-    assert spark_output.exception_df is not None
+    assert output.recon_df is not None
+    assert output.supply_df is not None
+    assert output.ops_failure_df is not None
+    assert output.ops_refund_df is not None
+    assert output.pairing_quality_df is not None
+    assert output.admin_tx_search_df is not None
+    assert output.exception_df is not None
 
-    assert _canonical_rows(
-        [row.asDict(recursive=True) for row in spark_output.recon_df.collect()],
-        sort_keys=("date_kst", "user_id"),
-    ) == _canonical_rows(
-        legacy["recon_rows"],
-        sort_keys=("date_kst", "user_id"),
-    )
-    assert _canonical_rows(
-        [row.asDict(recursive=True) for row in spark_output.supply_df.collect()],
-        sort_keys=("date_kst",),
-    ) == _canonical_rows(
-        legacy["supply_rows"],
-        sort_keys=("date_kst",),
-    )
-    assert _canonical_rows(
-        [row.asDict(recursive=True) for row in spark_output.ops_failure_df.collect()],
-        sort_keys=("date_kst", "merchant_name"),
-    ) == _canonical_rows(
-        legacy["ops_failure_rows"],
-        sort_keys=("date_kst", "merchant_name"),
-    )
-    assert _canonical_rows(
-        [row.asDict(recursive=True) for row in spark_output.ops_refund_df.collect()],
-        sort_keys=("date_kst", "merchant_name"),
-    ) == _canonical_rows(
-        legacy["ops_refund_rows"],
-        sort_keys=("date_kst", "merchant_name"),
-    )
-    assert _canonical_rows(
-        [
-            row.asDict(recursive=True)
-            for row in spark_output.pairing_quality_df.collect()
-        ],
-        sort_keys=("date_kst",),
-    ) == _canonical_rows(
-        legacy["pairing_rows"],
-        sort_keys=("date_kst",),
-    )
-    assert _canonical_rows(
-        [
-            row.asDict(recursive=True)
-            for row in spark_output.admin_tx_search_df.collect()
-        ],
-        sort_keys=("event_date_kst", "tx_id"),
-    ) == _canonical_rows(
-        legacy["admin_rows"],
-        sort_keys=("event_date_kst", "tx_id"),
+    recon_rows = [row.asDict(recursive=True) for row in output.recon_df.collect()]
+    assert len(recon_rows) == 4
+    recon_by_key = {(row["date_kst"], row["user_id"]): row for row in recon_rows}
+    assert recon_by_key[(date(2026, 2, 1), "u1")]["drift_abs"] == Decimal("10.00")
+    assert recon_by_key[(date(2026, 2, 1), "u1")]["dq_tag"] == "SOURCE_STALE"
+    assert recon_by_key[(date(2026, 2, 2), "u2")]["drift_abs"] == Decimal("20.00")
+
+    supply_rows = [row.asDict(recursive=True) for row in output.supply_df.collect()]
+    assert len(supply_rows) == 2
+    supply_by_date = {row["date_kst"]: row for row in supply_rows}
+    assert supply_by_date[date(2026, 2, 1)]["diff_amount"] == Decimal("-80.00")
+    assert supply_by_date[date(2026, 2, 2)]["diff_amount"] == Decimal("-30.00")
+    assert supply_by_date[date(2026, 2, 1)]["is_ok"] is False
+
+    failure_rows = [
+        row.asDict(recursive=True) for row in output.ops_failure_df.collect()
+    ]
+    assert len(failure_rows) == 4
+    failure_by_key = {
+        (row["date_kst"], row["merchant_name"]): row for row in failure_rows
+    }
+    assert failure_by_key[(date(2026, 2, 1), "Shop A")]["failed_cnt"] == 1
+    assert failure_by_key[(date(2026, 2, 2), "Shop B")]["failed_cnt"] == 0
+
+    refund_rows = [row.asDict(recursive=True) for row in output.ops_refund_df.collect()]
+    assert len(refund_rows) == 4
+    refund_by_key = {
+        (row["date_kst"], row["merchant_name"]): row for row in refund_rows
+    }
+    assert refund_by_key[(date(2026, 2, 2), "Shop B")]["refunded_cnt"] == 1
+    assert refund_by_key[(date(2026, 2, 2), "Shop B")]["refund_rate"] == Decimal(
+        "1.000000"
     )
 
-    spark_exceptions = []
-    for row in spark_output.exception_df.collect():
-        payload = row.asDict(recursive=True)
-        payload.pop("generated_at", None)
-        spark_exceptions.append(payload)
-    legacy_exceptions = []
-    for row in legacy["exception_rows"]:
-        payload = dict(row)
-        payload.pop("generated_at", None)
-        legacy_exceptions.append(payload)
-
-    assert _canonical_rows(
-        spark_exceptions,
-        sort_keys=("date_kst", "exception_type", "metric", "message", "run_id"),
-    ) == _canonical_rows(
-        legacy_exceptions,
-        sort_keys=("date_kst", "exception_type", "metric", "message", "run_id"),
+    pairing_rows = [
+        row.asDict(recursive=True) for row in output.pairing_quality_df.collect()
+    ]
+    assert len(pairing_rows) == 2
+    pairing_by_date = {row["date_kst"]: row for row in pairing_rows}
+    assert pairing_by_date[date(2026, 2, 2)]["pair_candidate_rate"] == Decimal(
+        "1.000000"
+    )
+    assert pairing_by_date[date(2026, 2, 2)]["join_payment_orders_rate"] == Decimal(
+        "0.500000"
     )
 
+    admin_rows = [
+        row.asDict(recursive=True) for row in output.admin_tx_search_df.collect()
+    ]
+    assert len(admin_rows) == 9
+    admin_by_tx_id = {row["tx_id"]: row for row in admin_rows}
+    assert admin_by_tx_id["tx_pair_left"]["paired_tx_id"] == "tx_pair_right"
+    assert admin_by_tx_id["tx_u1_d2"]["payment_status"] == "FAILED"
+
+    exception_rows = [
+        row.asDict(recursive=True) for row in output.exception_df.collect()
+    ]
+    assert len(exception_rows) == 6
     merge_key_set = {
         (
             row["date_kst"],
@@ -468,6 +322,6 @@ def test_pipeline_b_spark_parity_two_day_mixed(spark) -> None:
             row["metric"],
             row["message"],
         )
-        for row in spark_exceptions
+        for row in exception_rows
     }
-    assert len(merge_key_set) == len(spark_exceptions)
+    assert len(merge_key_set) == len(exception_rows)

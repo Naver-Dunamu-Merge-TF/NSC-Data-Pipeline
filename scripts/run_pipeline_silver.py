@@ -19,16 +19,8 @@ if str(_REPO_ROOT) not in sys.path:
 from src.common.config_loader import find_repo_root, get_config_value  # noqa: E402
 from src.io.spark_safety import safe_collect  # noqa: E402
 
-ENGINE_MODE_LEGACY = "legacy"
-ENGINE_MODE_SPARK = "spark"
 SPARK_SESSION_TIMEZONE = "UTC"
 MAX_PIPELINE_STATE_ROWS = 1
-MAX_WALLET_ROWS = 2_000_000
-MAX_LEDGER_ROWS = 5_000_000
-MAX_PAYMENT_ORDER_ROWS = 2_000_000
-MAX_ORDERS_ROWS = 2_000_000
-MAX_ORDER_ITEMS_ROWS = 2_000_000
-MAX_PRODUCTS_ROWS = 200_000
 
 
 def parse_args() -> argparse.Namespace:
@@ -42,11 +34,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--date-kst-start")
     parser.add_argument("--date-kst-end")
     parser.add_argument("--run-id")
-    parser.add_argument(
-        "--engine-mode",
-        default=ENGINE_MODE_LEGACY,
-        choices=(ENGINE_MODE_LEGACY, ENGINE_MODE_SPARK),
-    )
     parser.add_argument(
         "--rule-load-mode",
         default="fallback",
@@ -91,10 +78,6 @@ def _align_to_contract(df, contract):
     return df.select(*contract.column_names)
 
 
-def _empty_df_for_contract(spark, contract):
-    return spark.createDataFrame([], schema=_contract_schema(contract))
-
-
 def _load_current_state(spark, table_fqn: str, pipeline_name: str):
     from src.io.pipeline_state_io import parse_pipeline_state_record
 
@@ -134,28 +117,6 @@ def _filter_to_windows(df, windows_utc, timestamp_fields: tuple[str, ...]):
     return df.filter(window_cond)
 
 
-def _append_bad_records(
-    spark,
-    *,
-    catalog: str,
-    bad_records: list[dict],
-) -> None:
-    from src.common.contracts import get_contract
-
-    contract = get_contract("silver.bad_records")
-    table_fqn = f"{catalog}.silver.bad_records"
-    if bad_records:
-        df = _align_to_contract(
-            spark.createDataFrame(bad_records, schema=_contract_schema(contract)),
-            contract,
-        )
-    else:
-        df = _empty_df_for_contract(spark, contract)
-    df.write.format("delta").mode("append").partitionBy(
-        "detected_date_kst"
-    ).saveAsTable(table_fqn)
-
-
 def _append_bad_records_df(
     spark,
     *,
@@ -191,13 +152,10 @@ def main() -> None:
     from src.io.rule_loader import load_runtime_rules
     from src.io.silver_io import write_silver_delta
     from src.jobs.pipeline_silver_spark import transform_silver_tables_spark
-    from src.transforms import analytics, silver_controls
+    from src.transforms import silver_controls
 
     spark = SparkSession.builder.getOrCreate()
     spark.conf.set("spark.sql.session.timeZone", SPARK_SESSION_TIMEZONE)
-    engine_mode = getattr(args, "engine_mode", ENGINE_MODE_LEGACY)
-    if engine_mode not in {ENGINE_MODE_LEGACY, ENGINE_MODE_SPARK}:
-        raise ValueError(f"Unsupported engine mode: {engine_mode!r}")
 
     params_payload = inject_default_daily_backfill(
         {
@@ -258,178 +216,54 @@ def main() -> None:
         allowed_entry_types = silver_controls.resolve_allowed_values(entry_type_rule)
         allowed_statuses = silver_controls.resolve_allowed_values(status_rule)
 
-        if engine_mode == ENGINE_MODE_SPARK:
-            spark_outputs = transform_silver_tables_spark(
-                wallet_df=wallet_df,
-                ledger_df=ledger_df,
-                payment_orders_df=payment_orders_df,
-                orders_df=orders_df,
-                order_items_df=order_items_df,
-                products_df=products_df,
-                run_id=params.run_id,
-                bad_rate_rule_id=bad_rate_rule.rule_id if bad_rate_rule else None,
-                entry_type_rule_id=entry_type_rule.rule_id if entry_type_rule else None,
-                allowed_entry_types=allowed_entry_types,
-                allowed_statuses=allowed_statuses,
-            )
-            _append_bad_records_df(
-                spark,
-                catalog=args.catalog,
-                bad_records_df=spark_outputs.bad_records_df,
-            )
+        spark_outputs = transform_silver_tables_spark(
+            wallet_df=wallet_df,
+            ledger_df=ledger_df,
+            payment_orders_df=payment_orders_df,
+            orders_df=orders_df,
+            order_items_df=order_items_df,
+            products_df=products_df,
+            run_id=params.run_id,
+            bad_rate_rule_id=bad_rate_rule.rule_id if bad_rate_rule else None,
+            entry_type_rule_id=entry_type_rule.rule_id if entry_type_rule else None,
+            allowed_entry_types=allowed_entry_types,
+            allowed_statuses=allowed_statuses,
+        )
+        _append_bad_records_df(
+            spark,
+            catalog=args.catalog,
+            bad_records_df=spark_outputs.bad_records_df,
+        )
 
-            silver_controls.enforce_bad_records_rate(
-                valid_count=spark_outputs.wallet_valid_count,
-                bad_count=spark_outputs.wallet_bad_count,
-                rule=bad_rate_rule,
-            )
-            silver_controls.enforce_bad_records_rate(
-                valid_count=spark_outputs.ledger_valid_count,
-                bad_count=spark_outputs.ledger_bad_count,
-                rule=bad_rate_rule,
-            )
+        silver_controls.enforce_bad_records_rate(
+            valid_count=spark_outputs.wallet_valid_count,
+            bad_count=spark_outputs.wallet_bad_count,
+            rule=bad_rate_rule,
+        )
+        silver_controls.enforce_bad_records_rate(
+            valid_count=spark_outputs.ledger_valid_count,
+            bad_count=spark_outputs.ledger_bad_count,
+            rule=bad_rate_rule,
+        )
 
-            silver_output_dfs = (
-                ("silver.wallet_snapshot", spark_outputs.wallet_snapshot_df),
-                ("silver.ledger_entries", spark_outputs.ledger_entries_df),
-                ("silver.order_events", spark_outputs.order_events_df),
-                ("silver.order_items", spark_outputs.order_items_df),
-                ("silver.products", spark_outputs.products_df),
+        silver_output_dfs = (
+            ("silver.wallet_snapshot", spark_outputs.wallet_snapshot_df),
+            ("silver.ledger_entries", spark_outputs.ledger_entries_df),
+            ("silver.order_events", spark_outputs.order_events_df),
+            ("silver.order_items", spark_outputs.order_items_df),
+            ("silver.products", spark_outputs.products_df),
+        )
+        for table_name, df in silver_output_dfs:
+            contract = get_contract(table_name)
+            validate_required_columns(df.columns, contract)
+            aligned_df = _align_to_contract(df, contract)
+            short_name = table_name.split(".", maxsplit=1)[1]
+            write_silver_delta(
+                aligned_df,
+                f"{args.catalog}.silver.{short_name}",
+                table_name=table_name,
+                mode="overwrite",
             )
-            for table_name, df in silver_output_dfs:
-                contract = get_contract(table_name)
-                validate_required_columns(df.columns, contract)
-                aligned_df = _align_to_contract(df, contract)
-                short_name = table_name.split(".", maxsplit=1)[1]
-                write_silver_delta(
-                    aligned_df,
-                    f"{args.catalog}.silver.{short_name}",
-                    table_name=table_name,
-                    mode="overwrite",
-                )
-        else:
-            wallet_raw = [
-                row.asDict(recursive=True)
-                for row in safe_collect(
-                    wallet_df,
-                    max_rows=MAX_WALLET_ROWS,
-                    context="pipeline_silver:user_wallets_raw",
-                )
-            ]
-            ledger_raw = [
-                row.asDict(recursive=True)
-                for row in safe_collect(
-                    ledger_df,
-                    max_rows=MAX_LEDGER_ROWS,
-                    context="pipeline_silver:transaction_ledger_raw",
-                )
-            ]
-            payment_orders_raw = [
-                row.asDict(recursive=True)
-                for row in safe_collect(
-                    payment_orders_df,
-                    max_rows=MAX_PAYMENT_ORDER_ROWS,
-                    context="pipeline_silver:payment_orders_raw",
-                )
-            ]
-            orders_raw = [
-                row.asDict(recursive=True)
-                for row in safe_collect(
-                    orders_df,
-                    max_rows=MAX_ORDERS_ROWS,
-                    context="pipeline_silver:orders_raw",
-                )
-            ]
-            order_items_raw = [
-                row.asDict(recursive=True)
-                for row in safe_collect(
-                    order_items_df,
-                    max_rows=MAX_ORDER_ITEMS_ROWS,
-                    context="pipeline_silver:order_items_raw",
-                )
-            ]
-            products_raw = [
-                row.asDict(recursive=True)
-                for row in safe_collect(
-                    products_df,
-                    max_rows=MAX_PRODUCTS_ROWS,
-                    context="pipeline_silver:products_raw",
-                )
-            ]
-
-            status_lookup = silver_controls.build_status_lookup(payment_orders_raw)
-            wallet_result = silver_controls.transform_wallet_snapshot_records(
-                wallet_raw,
-                run_id=params.run_id,
-                rule_id=bad_rate_rule.rule_id if bad_rate_rule else None,
-            )
-            ledger_result = silver_controls.transform_ledger_entries_records(
-                ledger_raw,
-                run_id=params.run_id,
-                rule_id=entry_type_rule.rule_id if entry_type_rule else None,
-                allowed_entry_types=allowed_entry_types,
-                allowed_statuses=allowed_statuses,
-                status_lookup=status_lookup,
-            )
-            order_events_result = analytics.transform_order_events_records(
-                orders_raw,
-                payment_orders_raw,
-                run_id=params.run_id,
-            )
-            order_items_result = analytics.transform_order_items_records(
-                order_items_raw,
-                run_id=params.run_id,
-            )
-            products_result = analytics.transform_products_records(
-                products_raw,
-                run_id=params.run_id,
-            )
-
-            silver_outputs = (
-                ("silver.wallet_snapshot", wallet_result),
-                ("silver.ledger_entries", ledger_result),
-                ("silver.order_events", order_events_result),
-                ("silver.order_items", order_items_result),
-                ("silver.products", products_result),
-            )
-
-            all_bad_records: list[dict] = []
-            for _, result in silver_outputs:
-                all_bad_records.extend(result.bad_records)
-            _append_bad_records(
-                spark, catalog=args.catalog, bad_records=all_bad_records
-            )
-
-            silver_controls.enforce_bad_records_rate(
-                valid_count=len(wallet_result.records),
-                bad_count=len(wallet_result.bad_records),
-                rule=bad_rate_rule,
-            )
-            silver_controls.enforce_bad_records_rate(
-                valid_count=len(ledger_result.records),
-                bad_count=len(ledger_result.bad_records),
-                rule=bad_rate_rule,
-            )
-
-            for table_name, result in silver_outputs:
-                contract = get_contract(table_name)
-                if result.records:
-                    validate_required_columns(result.records[0].keys(), contract)
-                    df = _align_to_contract(
-                        spark.createDataFrame(
-                            result.records, schema=_contract_schema(contract)
-                        ),
-                        contract,
-                    )
-                else:
-                    df = _empty_df_for_contract(spark, contract)
-                short_name = table_name.split(".", maxsplit=1)[1]
-                write_silver_delta(
-                    df,
-                    f"{args.catalog}.silver.{short_name}",
-                    table_name=table_name,
-                    mode="overwrite",
-                )
 
         success_state = apply_pipeline_state(
             pipeline_name="pipeline_silver",

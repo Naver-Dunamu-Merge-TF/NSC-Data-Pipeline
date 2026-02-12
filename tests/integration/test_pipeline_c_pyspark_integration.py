@@ -14,7 +14,7 @@ if shutil.which("java") is None:
     pytest.skip("Java is required to run local PySpark tests (install OpenJDK).")
 from pyspark.sql import SparkSession
 
-from src.jobs.pipeline_c import build_pipeline_c_fact_rows
+from src.jobs.pipeline_c_spark import transform_pipeline_c_fact_spark
 
 
 @pytest.fixture(scope="module")
@@ -55,15 +55,13 @@ def test_pipeline_c_smoke_with_local_pyspark(spark) -> None:
     )
     products_df = spark.createDataFrame([{"product_id": 10, "category": "BEANS"}])
 
-    rows = build_pipeline_c_fact_rows(
-        [row.asDict(recursive=True) for row in order_events_df.collect()],
-        [row.asDict(recursive=True) for row in order_items_df.collect()],
-        [row.asDict(recursive=True) for row in products_df.collect()],
+    result_df = transform_pipeline_c_fact_spark(
+        order_events_df,
+        order_items_df,
+        products_df,
         run_id="run-integration",
         salt="integration-salt",
     )
-
-    result_df = spark.createDataFrame(rows)
     result = result_df.collect()[0].asDict(recursive=True)
     expected_key = hashlib.sha256("user-1integration-salt".encode("utf-8")).hexdigest()
     assert result["user_key"] == expected_key

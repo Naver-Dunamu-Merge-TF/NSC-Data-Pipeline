@@ -19,10 +19,7 @@ if str(_REPO_ROOT) not in sys.path:
 from src.common.config_loader import find_repo_root, get_config_value  # noqa: E402
 from src.io.spark_safety import safe_collect  # noqa: E402
 
-ENGINE_MODE_LEGACY = "legacy"
-ENGINE_MODE_SPARK = "spark"
 MAX_PIPELINE_STATE_ROWS = 1
-MAX_SOURCE_COLLECT_ROWS = 2_000_000
 
 
 def parse_args() -> argparse.Namespace:
@@ -36,11 +33,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--date-kst-start")
     parser.add_argument("--date-kst-end")
     parser.add_argument("--run-id")
-    parser.add_argument(
-        "--engine-mode",
-        default=ENGINE_MODE_LEGACY,
-        choices=(ENGINE_MODE_LEGACY, ENGINE_MODE_SPARK),
-    )
     parser.add_argument(
         "--rule-load-mode",
         default="fallback",
@@ -124,16 +116,10 @@ def main() -> None:
         write_pipeline_state_delta,
     )
     from src.io.rule_loader import load_runtime_rules
-    from src.transforms.dq_guardrail import DQTableConfig, build_dq_status
+    from src.jobs.pipeline_a_spark import build_dq_status_spark
+    from src.transforms.dq_guardrail import DQTableConfig
 
     spark = SparkSession.builder.getOrCreate()
-    engine_mode = getattr(args, "engine_mode", ENGINE_MODE_LEGACY)
-    if engine_mode == ENGINE_MODE_SPARK:
-        raise NotImplementedError(
-            "pipeline_a spark engine path is not implemented yet; use --engine-mode legacy"
-        )
-    if engine_mode != ENGINE_MODE_LEGACY:
-        raise ValueError(f"Unsupported engine mode: {engine_mode!r}")
 
     params = JobParams.from_mapping(
         {
@@ -208,14 +194,6 @@ def main() -> None:
                         & (F.col("ingested_at") < F.lit(end_ts))
                     )
 
-                records = [
-                    row.asDict(recursive=True)
-                    for row in safe_collect(
-                        df,
-                        max_rows=MAX_SOURCE_COLLECT_ROWS,
-                        context=f"pipeline_a:{source['table']}",
-                    )
-                ]
                 config = DQTableConfig(
                     source_table=f"bronze.{source['table']}",
                     window_start_ts=start_ts,
@@ -224,8 +202,8 @@ def main() -> None:
                     dup_rule_metric=source["dup_metric"],
                     freshness_fields=source["freshness_fields"],
                 )
-                output = build_dq_status(
-                    records,
+                output = build_dq_status_spark(
+                    df,
                     config=config,
                     run_id=params.run_id,
                     rules=rules,

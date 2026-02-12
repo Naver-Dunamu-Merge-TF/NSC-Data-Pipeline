@@ -19,12 +19,7 @@ if str(_REPO_ROOT) not in sys.path:
 from src.common.config_loader import find_repo_root, get_config_value  # noqa: E402
 from src.io.spark_safety import safe_collect  # noqa: E402
 
-ENGINE_MODE_LEGACY = "legacy"
-ENGINE_MODE_SPARK = "spark"
 MAX_PIPELINE_STATE_ROWS = 1
-MAX_ORDER_EVENTS_ROWS = 2_000_000
-MAX_ORDER_ITEMS_ROWS = 2_000_000
-MAX_PRODUCTS_ROWS = 200_000
 
 
 def parse_args() -> argparse.Namespace:
@@ -34,11 +29,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--catalog", default=get_config_value("databricks.catalog"))
     parser.add_argument("--run-mode", default="")
     parser.add_argument("--run-id")
-    parser.add_argument(
-        "--engine-mode",
-        default=ENGINE_MODE_LEGACY,
-        choices=(ENGINE_MODE_LEGACY, ENGINE_MODE_SPARK),
-    )
     parser.add_argument("--start-ts")
     parser.add_argument("--end-ts")
     parser.add_argument("--date-kst-start")
@@ -116,17 +106,11 @@ def main() -> None:
         apply_pipeline_state,
         write_pipeline_state_delta,
     )
+    from src.io.secret_loader import resolve_user_key_salt
     from src.io.upstream_readiness import assert_pipeline_ready
-    from src.jobs.pipeline_c import build_pipeline_c_fact_rows
+    from src.jobs.pipeline_c_spark import transform_pipeline_c_fact_spark
 
     spark = SparkSession.builder.getOrCreate()
-    engine_mode = getattr(args, "engine_mode", ENGINE_MODE_LEGACY)
-    if engine_mode == ENGINE_MODE_SPARK:
-        raise NotImplementedError(
-            "pipeline_c spark engine path is not implemented yet; use --engine-mode legacy"
-        )
-    if engine_mode != ENGINE_MODE_LEGACY:
-        raise ValueError(f"Unsupported engine mode: {engine_mode!r}")
 
     params_payload = inject_default_daily_backfill(
         {
@@ -178,59 +162,38 @@ def main() -> None:
                 F.col("event_date_kst").isin(*params.target_dates())
             )
 
-        order_events = [
-            row.asDict(recursive=True)
-            for row in safe_collect(
-                order_events_df,
-                max_rows=MAX_ORDER_EVENTS_ROWS,
-                context="pipeline_c:order_events",
-            )
-        ]
-        order_items = [
-            row.asDict(recursive=True)
-            for row in safe_collect(
-                spark.table(f"{silver_schema}.order_items"),
-                max_rows=MAX_ORDER_ITEMS_ROWS,
-                context="pipeline_c:order_items",
-            )
-        ]
-        products = [
-            row.asDict(recursive=True)
-            for row in safe_collect(
-                spark.table(f"{silver_schema}.products"),
-                max_rows=MAX_PRODUCTS_ROWS,
-                context="pipeline_c:products",
-            )
-        ]
-
-        rows = build_pipeline_c_fact_rows(
-            order_events,
-            order_items,
-            products,
-            run_id=params.run_id,
-            salt=args.salt,
+        resolved_salt = args.salt or resolve_user_key_salt(
             secret_scope=args.secret_scope,
             secret_key=args.secret_key,
+            allow_local_fallback=True,
         )
-
-        if rows:
-            contract = get_contract("gold.fact_payment_anonymized")
-            df = _align_to_contract(
-                spark.createDataFrame(rows, schema=_contract_schema(contract)),
-                contract,
-            )
-            target_table = f"{args.catalog}.gold.fact_payment_anonymized"
-            write_gold_delta(
-                df,
-                target_table,
-                table_name="gold.fact_payment_anonymized",
-                mode="overwrite",
-            )
-            print(
-                f"Upserted {len(rows)} rows into {target_table} (run_id={params.run_id})"
-            )
-        else:
-            print("No rows generated for gold.fact_payment_anonymized")
+        result_df = transform_pipeline_c_fact_spark(
+            order_events_df,
+            spark.table(f"{silver_schema}.order_items"),
+            spark.table(f"{silver_schema}.products"),
+            run_id=params.run_id,
+            salt=resolved_salt,
+        )
+        result_df = result_df.persist()
+        try:
+            row_count = result_df.count()
+            if row_count > 0:
+                contract = get_contract("gold.fact_payment_anonymized")
+                df = _align_to_contract(result_df, contract)
+                target_table = f"{args.catalog}.gold.fact_payment_anonymized"
+                write_gold_delta(
+                    df,
+                    target_table,
+                    table_name="gold.fact_payment_anonymized",
+                    mode="overwrite",
+                )
+                print(
+                    f"Upserted {row_count} rows into {target_table} (run_id={params.run_id})"
+                )
+            else:
+                print("No rows generated for gold.fact_payment_anonymized")
+        finally:
+            result_df.unpersist()
 
         success_state = apply_pipeline_state(
             pipeline_name="pipeline_c",

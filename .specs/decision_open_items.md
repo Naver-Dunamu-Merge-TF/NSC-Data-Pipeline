@@ -1,7 +1,7 @@
 # 결정 필요 항목 목록 (Open Decisions)
 
 작성일: 2026-02-05
-업데이트: 2026-02-11
+업데이트: 2026-02-12
 
 ## 목적
 구현 중 **명확히 결정되지 않았거나 가정으로 처리한 항목**을 기록하고,
@@ -340,6 +340,10 @@
   3) `collect()` 정책은 `unbounded 금지 / bounded 허용`으로 고정하고 허용 경로는 `safe_collect(max_rows=...)`로 제한한다.
   4) 전환 우선순위는 `PR1(Silver) -> PR2(B) -> PR3(C) -> PR4(A) -> PR5(정리)`로 고정한다.
   5) 완료 기준은 기능 parity, 멱등성, L3 검증, 문서/증적 업데이트까지 포함한다.
+- 구현(2026-02-12, PR5):
+  1) `scripts/run_pipeline_a.py`, `scripts/run_pipeline_b.py`, `scripts/run_pipeline_c.py`, `scripts/run_pipeline_silver.py`를 spark-only로 정리했다.
+  2) `databricks.yml`에서 `engine_mode` 변수/잡 파라미터/CLI 전달 인자를 제거했다.
+  3) parity 통합 테스트를 spark 기대값 검증 테스트로 교체했다.
 - 근거:
   - 코드: `scripts/run_pipeline_a.py`, `scripts/run_pipeline_b.py`, `scripts/run_pipeline_c.py`
   - 문서: `.specs/d038_collect_removal_execution_plan.md`, `.specs/ops/performance_partitioning_checklist.md`
@@ -388,3 +392,16 @@
   - 로그: `.agents/logs/verification/L3_d036_resume_20260211T104159Z.log`
   - 코드: `src/common/table_metadata.py`, `scripts/run_pipeline_b.py`, `src/transforms/ledger_controls.py`, `src/transforms/dq_guardrail.py`
   - 테스트: `tests/unit/test_table_metadata.py`, `tests/integration/test_backfill_idempotency.py`
+
+### D-041 Pipeline C Spark category tie-break/조인 정책
+- 상태: **결정됨(2026-02-12)**
+- 결정:
+  1) `gold.fact_payment_anonymized.category` 파생 조인키는 `order_ref`만 사용한다. (`order_id` fallback 금지)
+  2) 대표 카테고리 선정 우선순위는 D-011을 유지한다. (`line_amount DESC`, 동률 시 `item_id` 최소)
+  3) dirty data(`item_id` 동시 NULL 동률)에서는 재실행 결정성을 위해 `product_id`, `category` 오름차순을 추가 tie-break로 사용한다.
+- 영향:
+  - 계약 준수 데이터에서는 legacy parity를 유지한다.
+  - 계약 위반/dirty 데이터에서도 Spark 경로 결과가 멱등적으로 고정된다.
+- 근거:
+  - 코드: `src/jobs/pipeline_c_spark.py`, `tests/integration/test_pipeline_c_spark.py`
+  - 문서: D-011, D-038
