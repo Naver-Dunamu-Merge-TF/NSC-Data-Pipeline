@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import sys
 from collections import defaultdict
 from pathlib import Path
 
 # Bootstrap: ensure repo root is on sys.path for src.* imports.
-_REPO_ROOT = Path(__file__).resolve().parent.parent
+_SCRIPT_PATH = (
+    globals().get("__file__") or inspect.getframeinfo(inspect.currentframe()).filename
+)
+_REPO_ROOT = Path(_SCRIPT_PATH).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
