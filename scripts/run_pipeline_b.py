@@ -20,12 +20,20 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from src.common.config_loader import find_repo_root, get_config_value  # noqa: E402
+from src.io.spark_safety import safe_collect  # noqa: E402
 
 TASK_ALL = "all"
 TASK_RECON = "recon"
 TASK_SUPPLY_OPS = "supply_ops"
 TASK_FINALIZE_SUCCESS = "finalize_success"
 TASK_FINALIZE_FAILURE = "finalize_failure"
+ENGINE_MODE_LEGACY = "legacy"
+ENGINE_MODE_SPARK = "spark"
+MAX_PIPELINE_STATE_ROWS = 1
+MAX_DQ_STATUS_ROWS = 100_000
+MAX_WALLET_SNAPSHOT_ROWS = 2_000_000
+MAX_LEDGER_ENTRIES_ROWS = 5_000_000
+MAX_PAYMENT_ORDERS_ROWS = 2_000_000
 
 VALID_TASKS = {
     TASK_ALL,
@@ -53,6 +61,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--date-kst-start")
     parser.add_argument("--date-kst-end")
     parser.add_argument("--run-id")
+    parser.add_argument(
+        "--engine-mode",
+        default=ENGINE_MODE_LEGACY,
+        choices=(ENGINE_MODE_LEGACY, ENGINE_MODE_SPARK),
+    )
     parser.add_argument(
         "--rule-load-mode",
         default="fallback",
@@ -119,11 +132,10 @@ def _load_current_state(spark, table_fqn: str, pipeline_name: str):
 
     if not spark.catalog.tableExists(table_fqn):
         return None
-    rows = (
-        spark.table(table_fqn)
-        .filter(F.col("pipeline_name") == F.lit(pipeline_name))
-        .limit(1)
-        .collect()
+    rows = safe_collect(
+        spark.table(table_fqn).filter(F.col("pipeline_name") == F.lit(pipeline_name)),
+        max_rows=MAX_PIPELINE_STATE_ROWS,
+        context=f"pipeline_state:{pipeline_name}",
     )
     if not rows:
         return None
@@ -160,7 +172,11 @@ def _load_dq_tags_by_date(spark, dq_table: str) -> dict[date, list[str]]:
     dq_tags_by_date: dict[date, list[str]] = {}
     if not spark.catalog.tableExists(dq_table):
         return dq_tags_by_date
-    for row in spark.table(dq_table).collect():
+    for row in safe_collect(
+        spark.table(dq_table),
+        max_rows=MAX_DQ_STATUS_ROWS,
+        context="pipeline_b:dq_status",
+    ):
         payload = row.asDict(recursive=True)
         row_date = _normalize_date(payload.get("date_kst"))
         dq_tag = payload.get("dq_tag")
@@ -281,6 +297,14 @@ def main() -> None:
     )
 
     spark = SparkSession.builder.getOrCreate()
+    engine_mode = getattr(args, "engine_mode", ENGINE_MODE_LEGACY)
+    if engine_mode == ENGINE_MODE_SPARK:
+        raise NotImplementedError(
+            "pipeline_b spark engine path is not implemented yet; use --engine-mode legacy"
+        )
+    if engine_mode != ENGINE_MODE_LEGACY:
+        raise ValueError(f"Unsupported engine mode: {engine_mode!r}")
+
     params_payload = inject_default_daily_backfill(
         {
             "run_mode": args.run_mode,
@@ -361,17 +385,29 @@ def main() -> None:
 
         wallet_snapshots = [
             row.asDict(recursive=True)
-            for row in spark.table(f"{silver_schema}.wallet_snapshot").collect()
+            for row in safe_collect(
+                spark.table(f"{silver_schema}.wallet_snapshot"),
+                max_rows=MAX_WALLET_SNAPSHOT_ROWS,
+                context="pipeline_b:wallet_snapshot",
+            )
         ]
         ledger_entries = [
             row.asDict(recursive=True)
-            for row in spark.table(f"{silver_schema}.ledger_entries").collect()
+            for row in safe_collect(
+                spark.table(f"{silver_schema}.ledger_entries"),
+                max_rows=MAX_LEDGER_ENTRIES_ROWS,
+                context="pipeline_b:ledger_entries",
+            )
         ]
         payment_orders: list[dict] = []
         if task in {TASK_ALL, TASK_SUPPLY_OPS}:
             payment_orders = [
                 row.asDict(recursive=True)
-                for row in spark.table(f"{bronze_schema}.payment_orders_raw").collect()
+                for row in safe_collect(
+                    spark.table(f"{bronze_schema}.payment_orders_raw"),
+                    max_rows=MAX_PAYMENT_ORDERS_ROWS,
+                    context="pipeline_b:payment_orders_raw",
+                )
             ]
 
         dq_tags_by_date = _load_dq_tags_by_date(spark, f"{silver_schema}.dq_status")

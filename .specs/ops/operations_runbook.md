@@ -33,6 +33,7 @@ Last updated: 2026-02-11
 - `start_ts`, `end_ts` (UTC window)
 - `date_kst_start`, `date_kst_end` (backfill day window)
 - `run_id`
+- `engine_mode`: `legacy | spark` (D-038 단계 전환 중, 현재 기본 `legacy`)
 - `rule_load_mode` (A/B/Silver): `strict | fallback`
 
 운영 기본값(D-035):

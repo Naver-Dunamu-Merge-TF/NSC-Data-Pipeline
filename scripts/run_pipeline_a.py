@@ -17,6 +17,12 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from src.common.config_loader import find_repo_root, get_config_value  # noqa: E402
+from src.io.spark_safety import safe_collect  # noqa: E402
+
+ENGINE_MODE_LEGACY = "legacy"
+ENGINE_MODE_SPARK = "spark"
+MAX_PIPELINE_STATE_ROWS = 1
+MAX_SOURCE_COLLECT_ROWS = 2_000_000
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,6 +36,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--date-kst-start")
     parser.add_argument("--date-kst-end")
     parser.add_argument("--run-id")
+    parser.add_argument(
+        "--engine-mode",
+        default=ENGINE_MODE_LEGACY,
+        choices=(ENGINE_MODE_LEGACY, ENGINE_MODE_SPARK),
+    )
     parser.add_argument(
         "--rule-load-mode",
         default="fallback",
@@ -79,11 +90,10 @@ def _load_current_state(spark, table_fqn: str, pipeline_name: str):
 
     if not spark.catalog.tableExists(table_fqn):
         return None
-    rows = (
-        spark.table(table_fqn)
-        .filter(F.col("pipeline_name") == F.lit(pipeline_name))
-        .limit(1)
-        .collect()
+    rows = safe_collect(
+        spark.table(table_fqn).filter(F.col("pipeline_name") == F.lit(pipeline_name)),
+        max_rows=MAX_PIPELINE_STATE_ROWS,
+        context=f"pipeline_state:{pipeline_name}",
     )
     if not rows:
         return None
@@ -117,6 +127,14 @@ def main() -> None:
     from src.transforms.dq_guardrail import DQTableConfig, build_dq_status
 
     spark = SparkSession.builder.getOrCreate()
+    engine_mode = getattr(args, "engine_mode", ENGINE_MODE_LEGACY)
+    if engine_mode == ENGINE_MODE_SPARK:
+        raise NotImplementedError(
+            "pipeline_a spark engine path is not implemented yet; use --engine-mode legacy"
+        )
+    if engine_mode != ENGINE_MODE_LEGACY:
+        raise ValueError(f"Unsupported engine mode: {engine_mode!r}")
+
     params = JobParams.from_mapping(
         {
             "run_mode": args.run_mode,
@@ -190,7 +208,14 @@ def main() -> None:
                         & (F.col("ingested_at") < F.lit(end_ts))
                     )
 
-                records = [row.asDict(recursive=True) for row in df.collect()]
+                records = [
+                    row.asDict(recursive=True)
+                    for row in safe_collect(
+                        df,
+                        max_rows=MAX_SOURCE_COLLECT_ROWS,
+                        context=f"pipeline_a:{source['table']}",
+                    )
+                ]
                 config = DQTableConfig(
                     source_table=f"bronze.{source['table']}",
                     window_start_ts=start_ts,

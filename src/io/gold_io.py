@@ -12,6 +12,9 @@ from src.common.table_metadata import (
     GOLD_WRITE_STRATEGY,
 )
 from src.io.merge_utils import merge_delta_table
+from src.io.spark_safety import safe_collect
+
+MAX_PARTITION_VALUES_FOR_REPLACE_WHERE = 366
 
 
 @dataclass(frozen=True)
@@ -85,7 +88,11 @@ def _build_replace_where(
     column = columns[0]
     values = [
         row[column]
-        for row in df.select(column).distinct().collect()
+        for row in safe_collect(
+            df.select(column).distinct(),
+            max_rows=MAX_PARTITION_VALUES_FOR_REPLACE_WHERE,
+            context=f"replace_where:{column}",
+        )
         if row[column] is not None
     ]
     if not values:

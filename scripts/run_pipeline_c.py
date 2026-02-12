@@ -17,6 +17,14 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from src.common.config_loader import find_repo_root, get_config_value  # noqa: E402
+from src.io.spark_safety import safe_collect  # noqa: E402
+
+ENGINE_MODE_LEGACY = "legacy"
+ENGINE_MODE_SPARK = "spark"
+MAX_PIPELINE_STATE_ROWS = 1
+MAX_ORDER_EVENTS_ROWS = 2_000_000
+MAX_ORDER_ITEMS_ROWS = 2_000_000
+MAX_PRODUCTS_ROWS = 200_000
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,6 +34,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--catalog", default=get_config_value("databricks.catalog"))
     parser.add_argument("--run-mode", default="")
     parser.add_argument("--run-id")
+    parser.add_argument(
+        "--engine-mode",
+        default=ENGINE_MODE_LEGACY,
+        choices=(ENGINE_MODE_LEGACY, ENGINE_MODE_SPARK),
+    )
     parser.add_argument("--start-ts")
     parser.add_argument("--end-ts")
     parser.add_argument("--date-kst-start")
@@ -77,11 +90,10 @@ def _load_current_state(spark, table_fqn: str, pipeline_name: str):
 
     if not spark.catalog.tableExists(table_fqn):
         return None
-    rows = (
-        spark.table(table_fqn)
-        .filter(F.col("pipeline_name") == F.lit(pipeline_name))
-        .limit(1)
-        .collect()
+    rows = safe_collect(
+        spark.table(table_fqn).filter(F.col("pipeline_name") == F.lit(pipeline_name)),
+        max_rows=MAX_PIPELINE_STATE_ROWS,
+        context=f"pipeline_state:{pipeline_name}",
     )
     if not rows:
         return None
@@ -108,6 +120,14 @@ def main() -> None:
     from src.jobs.pipeline_c import build_pipeline_c_fact_rows
 
     spark = SparkSession.builder.getOrCreate()
+    engine_mode = getattr(args, "engine_mode", ENGINE_MODE_LEGACY)
+    if engine_mode == ENGINE_MODE_SPARK:
+        raise NotImplementedError(
+            "pipeline_c spark engine path is not implemented yet; use --engine-mode legacy"
+        )
+    if engine_mode != ENGINE_MODE_LEGACY:
+        raise ValueError(f"Unsupported engine mode: {engine_mode!r}")
+
     params_payload = inject_default_daily_backfill(
         {
             "run_mode": args.run_mode,
@@ -158,14 +178,29 @@ def main() -> None:
                 F.col("event_date_kst").isin(*params.target_dates())
             )
 
-        order_events = [row.asDict(recursive=True) for row in order_events_df.collect()]
+        order_events = [
+            row.asDict(recursive=True)
+            for row in safe_collect(
+                order_events_df,
+                max_rows=MAX_ORDER_EVENTS_ROWS,
+                context="pipeline_c:order_events",
+            )
+        ]
         order_items = [
             row.asDict(recursive=True)
-            for row in spark.table(f"{silver_schema}.order_items").collect()
+            for row in safe_collect(
+                spark.table(f"{silver_schema}.order_items"),
+                max_rows=MAX_ORDER_ITEMS_ROWS,
+                context="pipeline_c:order_items",
+            )
         ]
         products = [
             row.asDict(recursive=True)
-            for row in spark.table(f"{silver_schema}.products").collect()
+            for row in safe_collect(
+                spark.table(f"{silver_schema}.products"),
+                max_rows=MAX_PRODUCTS_ROWS,
+                context="pipeline_c:products",
+            )
         ]
 
         rows = build_pipeline_c_fact_rows(

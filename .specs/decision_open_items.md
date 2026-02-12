@@ -328,19 +328,21 @@
   - 문서: `.specs/decision_open_items.md`, `.specs/ops/azure_monitoring_integration_plan.md`, `.specs/ops/operations_runbook.md`
 
 ### D-038 대용량 처리 전략(`collect()` 제거)
-- 상태: **결정 필요(2026-02-11)**
+- 상태: **결정됨(2026-02-12)**
 - 배경:
   - A/B/C 런타임 경로에 driver `collect()` 사용이 다수 존재한다.
   - 데이터 규모 증가 시 driver 메모리 병목/실패 가능성이 높다.
 - 영향:
   - 실운영 확장 시 배치 실패율 상승 및 실행 시간 변동성 확대 리스크가 있다.
-- 결정 필요:
-  1) Spark DataFrame 기반 집계/조인으로 단계적 전환할지
-  2) 단기 완화로 row cap/샘플링/경고만 둘지
-  3) 전환 우선순위(A/B/C 중 어떤 경로부터 개선)와 완료 기준을 어떻게 둘지
+- 결정:
+  1) `legacy + spark` 병행 전환 후 최종 PR에서 legacy 경로를 제거한다.
+  2) PR0~PR4 동안 `--engine-mode legacy|spark`로 배포 안전장치를 유지하고, 정리 PR에서 spark-only로 단순화한다.
+  3) `collect()` 정책은 `unbounded 금지 / bounded 허용`으로 고정하고 허용 경로는 `safe_collect(max_rows=...)`로 제한한다.
+  4) 전환 우선순위는 `PR1(Silver) -> PR2(B) -> PR3(C) -> PR4(A) -> PR5(정리)`로 고정한다.
+  5) 완료 기준은 기능 parity, 멱등성, L3 검증, 문서/증적 업데이트까지 포함한다.
 - 근거:
   - 코드: `scripts/run_pipeline_a.py`, `scripts/run_pipeline_b.py`, `scripts/run_pipeline_c.py`
-  - 문서: `.specs/ops/performance_partitioning_checklist.md`
+  - 문서: `.specs/d038_collect_removal_execution_plan.md`, `.specs/ops/performance_partitioning_checklist.md`
 
 ### D-039 설정 SSOT 연결 + 하드코딩 제거
 - 상태: **결정됨(2026-02-12)**

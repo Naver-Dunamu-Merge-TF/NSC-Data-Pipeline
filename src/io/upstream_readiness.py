@@ -4,6 +4,7 @@ from datetime import datetime
 
 from src.common.time_utils import to_utc
 from src.io.pipeline_state_io import PipelineStateRecord, parse_pipeline_state_record
+from src.io.spark_safety import safe_collect
 
 
 class UpstreamReadinessError(RuntimeError):
@@ -49,11 +50,12 @@ def assert_pipeline_ready(
             f"(required upstream={upstream_pipeline_name})"
         )
 
-    rows = (
-        spark.table(table_fqn)
-        .filter(F.col("pipeline_name") == F.lit(upstream_pipeline_name))
-        .limit(1)
-        .collect()
+    rows = safe_collect(
+        spark.table(table_fqn).filter(
+            F.col("pipeline_name") == F.lit(upstream_pipeline_name)
+        ),
+        max_rows=1,
+        context=f"upstream_readiness:{upstream_pipeline_name}",
     )
     if not rows:
         raise UpstreamReadinessError(

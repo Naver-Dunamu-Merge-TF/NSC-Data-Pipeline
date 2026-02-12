@@ -17,6 +17,17 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from src.common.config_loader import find_repo_root, get_config_value  # noqa: E402
+from src.io.spark_safety import safe_collect  # noqa: E402
+
+ENGINE_MODE_LEGACY = "legacy"
+ENGINE_MODE_SPARK = "spark"
+MAX_PIPELINE_STATE_ROWS = 1
+MAX_WALLET_ROWS = 2_000_000
+MAX_LEDGER_ROWS = 5_000_000
+MAX_PAYMENT_ORDER_ROWS = 2_000_000
+MAX_ORDERS_ROWS = 2_000_000
+MAX_ORDER_ITEMS_ROWS = 2_000_000
+MAX_PRODUCTS_ROWS = 200_000
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,6 +41,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--date-kst-start")
     parser.add_argument("--date-kst-end")
     parser.add_argument("--run-id")
+    parser.add_argument(
+        "--engine-mode",
+        default=ENGINE_MODE_LEGACY,
+        choices=(ENGINE_MODE_LEGACY, ENGINE_MODE_SPARK),
+    )
     parser.add_argument(
         "--rule-load-mode",
         default="fallback",
@@ -83,11 +99,10 @@ def _load_current_state(spark, table_fqn: str, pipeline_name: str):
 
     if not spark.catalog.tableExists(table_fqn):
         return None
-    rows = (
-        spark.table(table_fqn)
-        .filter(F.col("pipeline_name") == F.lit(pipeline_name))
-        .limit(1)
-        .collect()
+    rows = safe_collect(
+        spark.table(table_fqn).filter(F.col("pipeline_name") == F.lit(pipeline_name)),
+        max_rows=MAX_PIPELINE_STATE_ROWS,
+        context=f"pipeline_state:{pipeline_name}",
     )
     if not rows:
         return None
@@ -161,6 +176,14 @@ def main() -> None:
     from src.transforms import analytics, silver_controls
 
     spark = SparkSession.builder.getOrCreate()
+    engine_mode = getattr(args, "engine_mode", ENGINE_MODE_LEGACY)
+    if engine_mode == ENGINE_MODE_SPARK:
+        raise NotImplementedError(
+            "pipeline_silver spark engine path is not implemented yet; use --engine-mode legacy"
+        )
+    if engine_mode != ENGINE_MODE_LEGACY:
+        raise ValueError(f"Unsupported engine mode: {engine_mode!r}")
+
     params_payload = inject_default_daily_backfill(
         {
             "run_mode": args.run_mode,
@@ -208,19 +231,53 @@ def main() -> None:
             ("created_at", "ingested_at"),
         )
 
-        wallet_raw = [row.asDict(recursive=True) for row in wallet_df.collect()]
-        ledger_raw = [row.asDict(recursive=True) for row in ledger_df.collect()]
-        payment_orders_raw = [
-            row.asDict(recursive=True) for row in payment_orders_df.collect()
+        wallet_raw = [
+            row.asDict(recursive=True)
+            for row in safe_collect(
+                wallet_df,
+                max_rows=MAX_WALLET_ROWS,
+                context="pipeline_silver:user_wallets_raw",
+            )
         ]
-        orders_raw = [row.asDict(recursive=True) for row in orders_df.collect()]
+        ledger_raw = [
+            row.asDict(recursive=True)
+            for row in safe_collect(
+                ledger_df,
+                max_rows=MAX_LEDGER_ROWS,
+                context="pipeline_silver:transaction_ledger_raw",
+            )
+        ]
+        payment_orders_raw = [
+            row.asDict(recursive=True)
+            for row in safe_collect(
+                payment_orders_df,
+                max_rows=MAX_PAYMENT_ORDER_ROWS,
+                context="pipeline_silver:payment_orders_raw",
+            )
+        ]
+        orders_raw = [
+            row.asDict(recursive=True)
+            for row in safe_collect(
+                orders_df,
+                max_rows=MAX_ORDERS_ROWS,
+                context="pipeline_silver:orders_raw",
+            )
+        ]
         order_items_raw = [
             row.asDict(recursive=True)
-            for row in spark.table(f"{bronze_schema}.order_items_raw").collect()
+            for row in safe_collect(
+                spark.table(f"{bronze_schema}.order_items_raw"),
+                max_rows=MAX_ORDER_ITEMS_ROWS,
+                context="pipeline_silver:order_items_raw",
+            )
         ]
         products_raw = [
             row.asDict(recursive=True)
-            for row in spark.table(f"{bronze_schema}.products_raw").collect()
+            for row in safe_collect(
+                spark.table(f"{bronze_schema}.products_raw"),
+                max_rows=MAX_PRODUCTS_ROWS,
+                context="pipeline_silver:products_raw",
+            )
         ]
 
         bad_rate_rule = select_rule(rules, domain="silver", metric="bad_records_rate")

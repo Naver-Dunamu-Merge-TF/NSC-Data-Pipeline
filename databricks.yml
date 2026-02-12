@@ -6,6 +6,8 @@ variables:
     description: Unity Catalog name
   cluster_policy_id:
     description: Cluster policy id
+  engine_mode:
+    description: Runtime engine mode for A/B/C/Silver (legacy|spark)
   rule_load_mode:
     description: Runtime rule load mode for Pipeline A/B/Silver (strict|fallback)
   rule_table:
@@ -18,6 +20,7 @@ targets:
     variables:
       catalog: hive_metastore
       cluster_policy_id: "000C31E193543DF5"
+      engine_mode: legacy
       rule_load_mode: fallback
       rule_table: gold.dim_rule_scd2
       rule_seed_path: mock_data/fixtures/dim_rule_scd2.json
@@ -26,6 +29,7 @@ targets:
     variables:
       catalog: prod_catalog
       cluster_policy_id: "<prod-cluster-policy-id>"
+      engine_mode: legacy
       rule_load_mode: strict
       rule_table: gold.dim_rule_scd2
       rule_seed_path: mock_data/fixtures/dim_rule_scd2.json
@@ -55,6 +59,8 @@ resources:
           default: ""
         - name: run_id
           default: ""
+        - name: engine_mode
+          default: ${var.engine_mode}
         - name: rule_load_mode
           default: ${var.rule_load_mode}
         - name: rule_table
@@ -93,6 +99,8 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--engine-mode"
+              - "{{job.parameters.engine_mode}}"
               - "--rule-load-mode"
               - "{{job.parameters.rule_load_mode}}"
               - "--rule-table"
@@ -123,6 +131,8 @@ resources:
           default: ""
         - name: run_id
           default: ""
+        - name: engine_mode
+          default: ${var.engine_mode}
         - name: rule_load_mode
           default: ${var.rule_load_mode}
         - name: rule_table
@@ -163,6 +173,8 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--engine-mode"
+              - "{{job.parameters.engine_mode}}"
               - "--rule-load-mode"
               - "{{job.parameters.rule_load_mode}}"
               - "--rule-table"
@@ -193,6 +205,8 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--engine-mode"
+              - "{{job.parameters.engine_mode}}"
               - "--rule-load-mode"
               - "{{job.parameters.rule_load_mode}}"
               - "--rule-table"
@@ -226,6 +240,8 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--engine-mode"
+              - "{{job.parameters.engine_mode}}"
               - "--rule-load-mode"
               - "{{job.parameters.rule_load_mode}}"
               - "--rule-table"
@@ -260,6 +276,8 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--engine-mode"
+              - "{{job.parameters.engine_mode}}"
               - "--rule-load-mode"
               - "{{job.parameters.rule_load_mode}}"
               - "--rule-table"
@@ -290,6 +308,8 @@ resources:
           default: ""
         - name: run_id
           default: ""
+        - name: engine_mode
+          default: ${var.engine_mode}
       job_clusters:
         - job_cluster_key: policy_single_node
           new_cluster:
@@ -322,6 +342,8 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--engine-mode"
+              - "{{job.parameters.engine_mode}}"
 
     pipeline_silver_materialization:
       name: data-pipeline-silver-${bundle.target}
@@ -346,6 +368,8 @@ resources:
           default: ""
         - name: run_id
           default: ""
+        - name: engine_mode
+          default: ${var.engine_mode}
         - name: rule_load_mode
           default: ${var.rule_load_mode}
         - name: rule_table
@@ -384,6 +408,8 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--engine-mode"
+              - "{{job.parameters.engine_mode}}"
               - "--rule-load-mode"
               - "{{job.parameters.rule_load_mode}}"
               - "--rule-table"
@@ -520,6 +546,8 @@ resources:
           default: ""
         - name: run_id
           default: ""
+        - name: engine_mode
+          default: ${var.engine_mode}
         - name: rule_load_mode
           default: ${var.rule_load_mode}
         - name: rule_table
@@ -568,6 +596,8 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--engine-mode"
+              - "{{job.parameters.engine_mode}}"
               - "--rule-load-mode"
               - "{{job.parameters.rule_load_mode}}"
               - "--rule-table"
@@ -595,6 +625,8 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--engine-mode"
+              - "{{job.parameters.engine_mode}}"
               - "--rule-load-mode"
               - "{{job.parameters.rule_load_mode}}"
               - "--rule-table"
@@ -622,6 +654,8 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--engine-mode"
+              - "{{job.parameters.engine_mode}}"
               - "--rule-load-mode"
               - "{{job.parameters.rule_load_mode}}"
               - "--rule-table"
@@ -649,3 +683,5 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--engine-mode"
+              - "{{job.parameters.engine_mode}}"

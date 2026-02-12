@@ -21,6 +21,7 @@ def _args(task: str) -> SimpleNamespace:
         date_kst_start="2026-02-11",
         date_kst_end="2026-02-11",
         run_id="run-readiness-fail",
+        engine_mode="legacy",
         rule_load_mode="fallback",
         rule_table="gold.dim_rule_scd2",
         rule_seed_path="mock_data/fixtures/dim_rule_scd2.json",

@@ -7,12 +7,14 @@ from pathlib import Path
 from typing import Any
 
 from src.common.rules import RuleDefinition
+from src.io.spark_safety import safe_collect
 
 RULE_LOAD_MODE_STRICT = "strict"
 RULE_LOAD_MODE_FALLBACK = "fallback"
 VALID_RULE_LOAD_MODES = frozenset((RULE_LOAD_MODE_STRICT, RULE_LOAD_MODE_FALLBACK))
 DEFAULT_RULE_TABLE_NAME = "gold.dim_rule_scd2"
 DEFAULT_RULE_SEED_PATH = Path("mock_data/fixtures/dim_rule_scd2.json")
+DEFAULT_RULE_TABLE_MAX_ROWS = 1000
 LOGGER = logging.getLogger(__name__)
 
 
@@ -99,7 +101,12 @@ def load_rule_table(spark, table_fqn: str) -> list[RuleDefinition]:
 
     try:
         payload = [
-            row.asDict(recursive=True) for row in spark.table(table_fqn).collect()
+            row.asDict(recursive=True)
+            for row in safe_collect(
+                spark.table(table_fqn),
+                max_rows=DEFAULT_RULE_TABLE_MAX_ROWS,
+                context=f"rule_loader:{table_fqn}",
+            )
         ]
     except Exception as exc:
         raise RuleTableAccessError(f"Rule table read failed: {table_fqn}") from exc
