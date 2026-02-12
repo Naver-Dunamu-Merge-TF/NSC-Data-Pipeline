@@ -1,6 +1,6 @@
 # Cloud Migration/Rebuild Plan (Data-pipeline, Test-first)
 
-Last updated: 2026-02-09
+Last updated: 2026-02-12
 
 ## 1. 목적
 
@@ -25,10 +25,12 @@ Last updated: 2026-02-09
 - ADLS Storage Account: `2dtfinalteam4storagetest`
 - ADLS Container: `2dt-final-team4-adls-test`
 
-현재 상태(2026-02-09 기준):
+현재 상태(2026-02-12 기준, 레포 기준 + 실클라우드 검증 필요):
 
-- 기존 dev 테스트 리소스는 삭제된 상태로 간주한다.
-- 신규 dev 테스트 리소스는 추후 재생성 예정이며, 새 식별값으로 설정/문서를 동기화해야 한다.
+- 2026-02-09 기준 기존 dev 테스트 리소스는 삭제된 상태로 간주한다.
+- 신규 dev 테스트 리소스 재생성 여부와 실제 식별값은 `scripts/phase7/audit_cloud_state.sh` 증적 기준으로 재확정이 필요하다.
+- `configs/dev.yaml`에는 dev baseline 값(`workspace_id=57710310442212`, `catalog=2dt_final_team4_databricks_test`, `external_location=team4_adls_test`, `base_path=abfss://2dt-final-team4-adls-test@2dtfinalteam4storagetest.dfs.core.windows.net`)이 기록되어 있으며, 실환경 일치 여부는 검증 필요 상태다.
+- `scripts/phase7/setup_minimal_cloud.sh` 기본값(`SCOPE_NAME=ledger-analytics-dev`, `SCOPE_KEY=salt_user_key`, `PIPELINE_A_JOB_ID=57710310442212`)은 재적용 기준값이며, 적용 완료 여부는 검증 필요 상태다.
 
 재빌드 시 복원/확정 필요 항목:
 
@@ -37,10 +39,10 @@ Last updated: 2026-02-09
 - Slack 알림 채널 미연동(현재 Email only)
 - Pipeline B/C Workflow 정책 미배포(재빌드 후 반영 필요)
 
-재빌드/활성화 전 확정이 필요한 의사결정:
+재빌드/활성화 전 재검토가 필요한 결정 연계 항목:
 
-- D-016: `gold.fact_payment_anonymized` 멱등성/파티셔닝 방식
-- D-018: 서비스 프린시플 실행 주체 전환 시점
+- D-016(결정됨): 현재 `date_kst` overwrite partition 전략은 개발단계 임시 정책이다. 재활성화 이후 운영 데이터량 기준으로 `MERGE` 전환 필요성을 재평가한다.
+- D-018(결정됨): 서비스 프린시플 기반 전환 시점은 Phase 11로 고정되었으므로, 재빌드 단계에서는 전환 전제 조건(run_as principal/권한/컷오버 타이밍) 충족 여부를 점검한다.
 
 ## 3. 범위
 
@@ -78,6 +80,11 @@ Phase 7~8 항목 기준:
 - 이름 패턴: `<org>-<project>-<env>-<purpose>`
 - 필수 태그: `env`, `owner`, `cost_center`, `destroyable`, `expires_on`
 - 파괴 가능 환경(`destroyable=true`)만 자동 정리 대상에 포함
+
+리소스 인벤토리/네이밍 운영 원칙(현재):
+
+- 별도 inventory 문서를 두지 않고 본 문서의 체크리스트(12.1)와 검증 증적(`.agents/logs/verification/`)을 기준으로 관리한다.
+- 리소스 식별값이나 태그 정책이 바뀌면 `configs/dev.yaml`, `.specs/cloud/phase7_cloud_setup_status.md`, 본 문서를 같은 변경 단위로 갱신한다.
 
 ## 5. 데이터/스키마 마이그레이션 전략
 
@@ -286,12 +293,13 @@ Phase 7~8 항목 기준:
 
 저장소 설정 최소 변경:
 - [ ] `configs/dev.yaml`의 `workspace_host`, `workspace_id`, `catalog`, `cluster_policy_id`, `external_location`, `base_path`를 갱신한다.
-- [ ] `configs/common.yaml`의 `analytics.secret_scope`, `analytics.secret_key`를 갱신한다.
+- [ ] `configs/dev.yaml`의 `analytics.secret_scope`를 갱신한다.
+- [ ] `configs/common.yaml`의 `analytics.secret_key`를 갱신한다.
 - [ ] `src/io/secret_loader.py`, `scripts/run_pipeline_c.py`, `scripts/phase7/setup_minimal_cloud.sh` 기본값을 점검한다.
 
 문서 최소 갱신:
 - [ ] `.specs/cloud/phase7_cloud_setup_status.md` 현재 환경값을 갱신한다.
-- [ ] `.specs/cloud/cloud_test_resource_naming.md` inventory/tag/TTL을 갱신한다.
+- [ ] 본 문서의 리소스 식별 규칙 기준으로 inventory/tag/TTL 상태를 갱신하고, 관련 audit 증적 링크를 추가한다.
 - [ ] 본 문서의 "삭제 전 참조값"과 "재빌드 후 현재값" 상태 문구를 함께 갱신한다.
 - [ ] 예외 운영 판단은 `.specs/decision_open_items.md`에 기록한다.
 
@@ -314,8 +322,8 @@ Phase 7~8 항목 기준:
 
 ## 14. 참조
 
-- `.roadmap/implementation_roadmap.md` (Phase 7~10)
+- `.roadmap/implementation_roadmap.md` (Workstream 기준, Legacy Phase 매핑 포함)
 - `.specs/project_specs.md`
 - `.specs/data_contract.md`
 - `.specs/decision_open_items.md`
-- `.specs/cloud_migration_rebuild_plan_ref.md`
+- `.specs/ops/cutover_preflight_exit_template.md`

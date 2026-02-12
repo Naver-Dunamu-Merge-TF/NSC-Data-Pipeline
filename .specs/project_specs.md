@@ -424,7 +424,7 @@ Planned:
 
 ---
 
-## 10) 개발/운영 페이즈 기준
+## 10) 개발/운영 로드맵 기준
 
 핵심 원칙:
 
@@ -433,7 +433,7 @@ Planned:
 
 자세한 계획:
 
-- `.roadmap/implementation_roadmap.md`
+- `.roadmap/implementation_roadmap.md` (Workstream 기준, Legacy Phase 매핑 포함)
 - `.specs/cloud/cloud_migration_rebuild_plan.md`
 - `.specs/ops/cutover_preflight_exit_template.md`
 

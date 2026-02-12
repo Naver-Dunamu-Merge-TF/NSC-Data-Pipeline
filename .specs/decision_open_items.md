@@ -101,7 +101,7 @@
 - 결정: `scope=ledger-analytics-dev`, `key=salt_user_key`
 - 후속: 운영 재구축 시 Key Vault-backed Secret Scope로 전환
 - 영향: `user_key` 익명화 구현 및 배포 환경 설정
-- 근거: `.specs/cloud/phase7_cloud_setup_status.md`, `scripts/phase7/setup_minimal_cloud.sh`
+- 근거: `.specs/cloud/phase7_cloud_setup_status.md`, `scripts/phase7/setup_minimal_cloud.sh`, `configs/dev.yaml`, `configs/common.yaml`
 
 ### D-015 로컬 더미 `salt` 값
 - 상태: **결정됨(2026-02-06)**
