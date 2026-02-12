@@ -16,13 +16,20 @@ Usage::
 from __future__ import annotations
 
 import os
+import re
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 _SENTINEL = object()
+ENV_OVERRIDE_PREFIX = "PIPELINE_CFG__"
+_INTEGER_PATTERN = re.compile(r"^[+-]?\d+$")
+_FLOAT_PATTERN = re.compile(
+    r"^[+-]?(?:\d+\.\d*|\.\d+|\d+[eE][+-]?\d+|\d+\.\d*[eE][+-]?\d+|\.\d+[eE][+-]?\d+)$"
+)
 
 _cached_config: dict | None = None
 _cached_repo_root: Path | None = None
@@ -72,6 +79,75 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return merged
 
 
+def _parse_env_override_value(raw_value: str) -> Any:
+    normalized = raw_value.strip()
+    lowered = normalized.lower()
+    if lowered == "true":
+        return True
+    if lowered == "false":
+        return False
+    if lowered == "null":
+        return None
+
+    if _INTEGER_PATTERN.match(normalized):
+        try:
+            return int(normalized)
+        except ValueError:
+            pass
+
+    if _FLOAT_PATTERN.match(normalized):
+        try:
+            return float(normalized)
+        except ValueError:
+            pass
+
+    return raw_value
+
+
+def _parse_env_override_key(raw_key: str) -> tuple[str, ...]:
+    segments = [segment.strip().lower() for segment in raw_key.split("__") if segment]
+    if not segments:
+        raise KeyError("Config key not found for env override: <empty>")
+    return tuple(segments)
+
+
+def _set_existing_config_path(
+    config: dict,
+    key_path: tuple[str, ...],
+    value: Any,
+) -> None:
+    joined_path = ".".join(key_path)
+    current: Any = config
+    for segment in key_path[:-1]:
+        if (
+            not isinstance(current, dict)
+            or segment not in current
+            or not isinstance(current[segment], dict)
+        ):
+            raise KeyError(f"Config key not found for env override: {joined_path}")
+        current = current[segment]
+
+    leaf = key_path[-1]
+    if not isinstance(current, dict) or leaf not in current:
+        raise KeyError(f"Config key not found for env override: {joined_path}")
+    current[leaf] = value
+
+
+def _apply_env_overrides(
+    config: dict,
+    *,
+    env_map: Mapping[str, str] | None = None,
+) -> dict:
+    source = env_map if env_map is not None else os.environ
+    for env_key in sorted(source.keys()):
+        if not env_key.startswith(ENV_OVERRIDE_PREFIX):
+            continue
+        key_path = _parse_env_override_key(env_key[len(ENV_OVERRIDE_PREFIX) :])
+        value = _parse_env_override_value(source[env_key])
+        _set_existing_config_path(config, key_path, value)
+    return config
+
+
 def load_config(
     *,
     env: str | None = None,
@@ -82,7 +158,8 @@ def load_config(
     1. Read ``configs/common.yaml`` (required).
     2. Read ``configs/{env}.yaml`` (optional override).
     3. Deep-merge override onto base.
-    4. Cache the result for the process lifetime.
+    4. Apply ``PIPELINE_CFG__`` env var overrides.
+    5. Cache the result for the process lifetime.
 
     Parameters
     ----------
@@ -112,6 +189,7 @@ def load_config(
             override: dict = yaml.safe_load(f) or {}
         base = _deep_merge(base, override)
 
+    base = _apply_env_overrides(base)
     _cached_config = base
     return base
 

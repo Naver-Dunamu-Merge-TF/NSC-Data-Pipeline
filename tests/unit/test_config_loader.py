@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import textwrap
 from pathlib import Path
 
@@ -22,6 +23,13 @@ def _clear_cache():
     reset_cache()
 
 
+@pytest.fixture(autouse=True)
+def _clear_pipeline_cfg_env(monkeypatch: pytest.MonkeyPatch):
+    for key in list(os.environ.keys()):
+        if key.startswith("PIPELINE_CFG__"):
+            monkeypatch.delenv(key, raising=False)
+
+
 @pytest.fixture()
 def config_tree(tmp_path: Path) -> Path:
     """Create a minimal configs directory with common + dev + prod yamls."""
@@ -37,6 +45,13 @@ def config_tree(tmp_path: Path) -> Path:
         analytics:
           secret_scope: common-scope
           secret_key: common-key
+        flags:
+          enabled: true
+        numeric:
+          int_value: 1
+          float_value: 1.5
+        optional:
+          maybe: present
         """)
     )
     (configs / "dev.yaml").write_text(
@@ -218,3 +233,33 @@ def test_get_config_value_null_value_returned(config_tree: Path):
     reset_cache()
     load_config(env="staging", repo_root=config_tree)
     assert get_config_value("databricks.catalog") is None
+
+
+# ---- env overrides ----
+
+
+def test_load_config_applies_env_overrides(config_tree: Path, monkeypatch):
+    monkeypatch.setenv("PIPELINE_CFG__DATABRICKS__CATALOG", "env-catalog")
+    monkeypatch.setenv("PIPELINE_CFG__FLAGS__ENABLED", "false")
+    monkeypatch.setenv("PIPELINE_CFG__NUMERIC__INT_VALUE", "42")
+    monkeypatch.setenv("PIPELINE_CFG__NUMERIC__FLOAT_VALUE", "2.75")
+    monkeypatch.setenv("PIPELINE_CFG__OPTIONAL__MAYBE", "null")
+
+    cfg = load_config(env="dev", repo_root=config_tree)
+    assert cfg["databricks"]["catalog"] == "env-catalog"
+    assert cfg["flags"]["enabled"] is False
+    assert cfg["numeric"]["int_value"] == 42
+    assert cfg["numeric"]["float_value"] == pytest.approx(2.75)
+    assert cfg["optional"]["maybe"] is None
+
+
+def test_load_config_env_override_unknown_key_raises(config_tree: Path, monkeypatch):
+    monkeypatch.setenv("PIPELINE_CFG__NOT__EXIST", "1")
+    with pytest.raises(KeyError, match="not.exist"):
+        load_config(env="dev", repo_root=config_tree)
+
+
+def test_load_config_ignores_non_matching_env_prefix(config_tree: Path, monkeypatch):
+    monkeypatch.setenv("PIPELINE_CF__PROJECT__NAME", "ignored")
+    cfg = load_config(env="dev", repo_root=config_tree)
+    assert cfg["project"]["name"] == "test-pipeline"

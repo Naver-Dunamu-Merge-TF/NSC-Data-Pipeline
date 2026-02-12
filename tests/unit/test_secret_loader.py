@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import pytest
 
+from src.common.config_loader import get_config_value
 from src.io.secret_loader import (
+    DEFAULT_SECRET_KEY,
+    DEFAULT_SECRET_SCOPE,
     LOCAL_DUMMY_SALT,
     resolve_user_key_salt,
 )
@@ -24,6 +27,11 @@ class _SecretClient:
 class _DbutilsStub:
     def __init__(self, value: str | None = None, *, raise_error: bool = False) -> None:
         self.secrets = _SecretClient(value, raise_error=raise_error)
+
+
+def test_default_secret_scope_and_key_are_from_config() -> None:
+    assert DEFAULT_SECRET_SCOPE == get_config_value("analytics.secret_scope")
+    assert DEFAULT_SECRET_KEY == get_config_value("analytics.secret_key")
 
 
 def test_resolve_user_key_salt_prefers_env() -> None:

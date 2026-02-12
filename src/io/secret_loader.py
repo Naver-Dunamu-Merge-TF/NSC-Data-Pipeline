@@ -6,10 +6,8 @@ from collections.abc import Mapping
 
 from src.common.config_loader import get_config_value
 
-DEFAULT_SECRET_SCOPE = get_config_value(
-    "analytics.secret_scope", "ledger-analytics-dev"
-)
-DEFAULT_SECRET_KEY = get_config_value("analytics.secret_key", "salt_user_key")
+DEFAULT_SECRET_SCOPE = get_config_value("analytics.secret_scope")
+DEFAULT_SECRET_KEY = get_config_value("analytics.secret_key")
 LOCAL_DUMMY_SALT = "local-salt-v1"
 ENV_ANON_SALT = "ANON_USER_KEY_SALT"
 ENV_DATABRICKS_RUNTIME_VERSION = "DATABRICKS_RUNTIME_VERSION"
