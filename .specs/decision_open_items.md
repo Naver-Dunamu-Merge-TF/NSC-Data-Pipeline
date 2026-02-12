@@ -418,3 +418,23 @@
 - 근거:
   - 코드: `src/jobs/pipeline_c_spark.py`, `tests/integration/test_pipeline_c_spark.py`
   - 문서: D-011, D-038
+
+### D-042 Pipeline A 빈 윈도우 파라미터 자동 해석
+- 상태: **결정됨(2026-02-12)**
+- 배경:
+  - `pipeline_a_guardrail`는 10분 스케줄이지만 기본 파라미터는 `run_mode=incremental` + `start_ts/end_ts` 공백으로 전달될 수 있다.
+  - `JobParams` 규칙상 incremental은 `start_ts/end_ts`가 필수라 런타임 시작 시점 실패가 발생할 수 있다.
+- 결정:
+  1) Pipeline A에 빈 윈도우 자동 해석을 도입한다.
+  2) 적용 조건: `run_mode`가 공백/`incremental`이고 `start_ts/end_ts/date_kst_start/date_kst_end`가 모두 공백인 경우.
+  3) 해석 규칙:
+     - `end_ts = now_utc`
+     - `start_ts = gold.pipeline_state(pipeline_a).last_processed_end` (존재 시)
+     - 상태가 없거나 역전(`start_ts >= end_ts`)이면 `start_ts = end_ts - 10분`
+  4) `run_mode`는 `incremental`로 고정한다.
+- 영향:
+  - Pipeline A 스케줄 실행과 파라미터 검증 규칙의 충돌을 제거한다.
+  - 체크포인트가 존재하면 연속성 기반 증분 처리, 없으면 최근 10분 기본 윈도우로 안전 시작한다.
+- 근거:
+  - 코드: `scripts/run_pipeline_a.py`, `src/common/window_defaults.py`
+  - 테스트: `tests/unit/test_window_defaults.py`

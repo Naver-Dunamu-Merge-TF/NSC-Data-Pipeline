@@ -1,6 +1,6 @@
 # 프로젝트 스펙 (Azure Databricks) — Ledger Controls & Analytics (v1.1)
 
-Last updated: 2026-02-11
+Last updated: 2026-02-12
 
 > 요구사항 SSOT: `.ref/SRS - Software Requirements Specification.md`  
 > DB 스키마 스냅샷: `.ref/database_schema`  
@@ -18,6 +18,9 @@ Last updated: 2026-02-11
 
 - Pipeline A/B/C Databricks Workflow 배포 모델 (`databricks.yml`) 반영
 - `run_mode/start_ts/end_ts/date_kst_start/date_kst_end/run_id` 표준 파라미터 반영
+- Pipeline A 빈 윈도우 파라미터 자동 해석 적용 (D-042)
+  - `run_mode`가 공백/`incremental`이고 윈도우 파라미터가 모두 공백이면 자동 incremental 윈도우를 계산한다.
+  - 우선순위: `start_ts = pipeline_state.last_processed_end`(존재 시), 없으면 `now-10분`; `end_ts = now`
 - Gold 핵심 산출물 구현
   - `gold.recon_daily_snapshot_flow`
   - `gold.ledger_supply_balance_daily`
@@ -28,7 +31,10 @@ Last updated: 2026-02-11
   - `gold.admin_tx_search`
   - `gold.exception_ledger`
   - `gold.pipeline_state`
-- `silver.bad_records` 영속화 구현 (현재 경로: E2E setup, 저장 후 fail-fast)
+- `gold.dim_rule_scd2`
+- `silver.bad_records` 영속화 구현
+  - 운영 경로: `run_pipeline_silver`에서 `append-only` 적재
+  - fail-fast: `wallet_snapshot`/`ledger_entries` bad rate 임계치 초과 시 실패 처리
 - 운영 Silver 물질화 경로 구현 (`run_pipeline_silver`, `pipeline_silver_materialization`)
   - B/C는 `pipeline_silver` 체크포인트 기반 fail-closed dependency 적용
   - B/C/Silver는 빈 윈도우 파라미터 시 `전일(KST) 1일 backfill` 기본 해석
@@ -125,6 +131,7 @@ Databricks는 결제/지갑 OLTP를 대체하는 시스템이 아니라, NSC 결
 - 운영지표: `gold.ops_payment_failure_daily`, `gold.ops_payment_refund_daily`, `gold.ops_ledger_pairing_quality_daily`
 - 관리자 보조 인덱스: `gold.admin_tx_search`
 - 분석: `gold.fact_payment_anonymized`
+- 룰 SSOT: `gold.dim_rule_scd2`
 
 Planned:
 - `gold.fact_market_price` (FR-ANA-02)
@@ -141,6 +148,7 @@ Planned:
 | Silver | `0 0 0 * * ?` | 3600s | 2회, 5분 간격 |
 | B | `0 20 0 * * ?` | 3600s | task별 2회, 5분 간격 |
 | C | `0 35 0 * * ?` | 3600s | 2회, 5분 간격 |
+| bad_records cleanup | `0 50 0 1 * ?` | 3600s | 2회, 5분 간격 |
 
 근거: `databricks.yml`
 
@@ -162,7 +170,25 @@ Planned:
 
 - `incremental`: `start_ts/end_ts` 필수
 - `backfill`: `date_kst_start/end` 또는 `start_ts/end_ts`로 날짜 범위 해석 필수
+- 운영 기본값(D-042): A에서 `run_mode`가 공백/`incremental`이고 윈도우 파라미터가 모두 공백이면 자동 incremental 윈도우(`start_ts=last_processed_end|now-10m`, `end_ts=now`)를 해석한다.
 - 운영 기본값(D-035): B/C/Silver에서 윈도우 파라미터가 공백이면 `run_mode=backfill`, `date_kst_start=end=전일(KST)`로 자동 해석
+
+### 3.4 운영 Workflow 인벤토리
+
+- 정기 스케줄 jobs
+  - `pipeline_a_guardrail`, `pipeline_silver_materialization`, `pipeline_b_controls`, `pipeline_c_analytics`
+  - `bad_records_retention_cleanup`
+- 온디맨드 운영/지원 jobs
+  - `bootstrap_catalog` (UC schema/table bootstrap)
+  - `sync_dim_rule_scd2` (룰 테이블 반영)
+- E2E/검증 jobs
+  - `e2e_setup_mock_data`, `e2e_cleanup_mock_data`, `e2e_full_pipeline`
+
+### 3.5 설정 SSOT와 우선순위
+
+- 설정 SSOT: `configs/common.yaml`, `configs/{env}.yaml`
+- 적용 우선순위: `CLI args > env vars > configs/{env}.yaml > configs/common.yaml`
+- 환경변수 오버라이드: `PIPELINE_CFG__<NESTED__KEY>` 형식 지원
 
 ---
 
@@ -203,6 +229,10 @@ Planned:
 - 스냅샷 경계: 대상 `date_kst` 내 `snapshot_ts` 최소/최대값 사용 (D-002)
 - 대사: `delta_balance_total - net_flow_total`
 - 공급량: `event_kst <= target_date` 누적에서 공급 타입만 합산
+- upstream readiness(fail-closed):
+  - 기준: `pipeline_silver.last_processed_end >= required_processed_end`
+  - 미충족 시 실패 처리(산출물 미작성)
+  - 비상/수동 실행에서만 `--skip-upstream-readiness-check` 우회 허용
 
 산출:
 
@@ -224,8 +254,13 @@ Planned:
 핵심 규칙:
 
 - `silver.order_events` 중 `order_source = PAYMENT_ORDERS`만 적재 (D-012)
-- `category`는 대표 아이템(line_amount 최대, 동률 시 item_id 최소) 기준 (D-011)
+- `category`는 대표 아이템(line_amount 최대) 기준
+  - 동률 처리: `item_id` 최소 우선, 추가 tie-break로 `product_id`, `category` 오름차순 적용 (D-011, D-041)
 - `user_key = sha256(user_id + salt)`
+- upstream readiness(fail-closed):
+  - 기준: `pipeline_silver.last_processed_end >= required_processed_end`
+  - 미충족 시 실패 처리(산출물 미작성)
+  - 비상/수동 실행에서만 `--skip-upstream-readiness-check` 우회 허용
 
 산출:
 
@@ -253,11 +288,14 @@ Planned:
 - 룰 SSOT: `gold.dim_rule_scd2`
 - Pipeline A/B/Silver 런타임:
   - `strict`: 테이블 로딩 실패 시 즉시 실패(fail-closed)
-  - `fallback`: 테이블 우선, 실패 시 `mock_data/fixtures/dim_rule_scd2.json` fallback
+  - `fallback`: 테이블 미존재/접근 실패 시에만 `mock_data/fixtures/dim_rule_scd2.json` fallback
+  - 테이블 payload 무결성 오류(중복 rule_id, domain+metric current 중복, 형식 오류)는 fallback 없이 fail-fast
 - 룰 반영/배포 경로: `sync_dim_rule_scd2` job로 `gold.dim_rule_scd2`를 갱신하고 런타임은 해당 테이블을 읽는다.
 - 기본 운영 정책:
   - prod: `strict`
   - dev/test: `fallback`
+- prod 가드레일:
+  - prod 문맥(`PIPELINE_ENV=prod` 또는 prod catalog 판별)에서 `rule_load_mode != strict`는 즉시 차단한다.
 
 ### 5.3 주요 결정 연계
 
@@ -266,6 +304,7 @@ Planned:
 - D-020: `pipeline_state` 성공/실패 갱신 규칙
 - D-033: `silver.bad_records` 영속화 방식
 - D-040: `gold.exception_ledger` MERGE key 확장 + 동일 `run_id` 재실행 수렴 기준
+- D-042: Pipeline A 빈 윈도우 파라미터 자동 incremental 해석
 
 ---
 
@@ -277,6 +316,7 @@ Planned:
 |---|---|---|
 | Silver | `wallet_snapshot`, `ledger_entries`, `order_events`, `order_items`, `products` | MERGE |
 | Silver | `dq_status` | append |
+| Silver | `bad_records` | append (`detected_date_kst` partition) |
 | Gold | `recon_daily_snapshot_flow`, `ledger_supply_balance_daily`, `ops_*`, `admin_tx_search`, `pipeline_state` | MERGE |
 | Gold | `exception_ledger` | A는 append, B는 MERGE |
 | Gold | `fact_payment_anonymized` | `date_kst` 파티션 overwrite (`replaceWhere`) |
@@ -331,7 +371,7 @@ Planned:
 ### 8.1 salt 해석 우선순위 (Current)
 
 1. `ANON_USER_KEY_SALT` 환경변수
-2. Databricks Secret Scope (`ledger-analytics-dev/salt_user_key`)
+2. Databricks Secret Scope (`configs/*`의 `analytics.secret_scope` + `analytics.secret_key`)
 3. 로컬 더미 `local-salt-v1` (Databricks 런타임 외에서만 허용)
 
 ### 8.2 Databricks 런타임 동작
@@ -353,8 +393,11 @@ Planned:
 
 ### 9.2 CI 게이트 (Current)
 
-- Unit coverage gate: `.venv/bin/python -m pytest tests/unit/ --cov=src --cov-fail-under=80`
-- Integration smoke: `.venv/bin/python -m pytest tests/integration/ --cov=src --cov-fail-under=60`
+- Unit coverage gate: `python -m pytest tests/unit/ -v --cov=src --cov-fail-under=80`
+- Integration smoke: `python -m pytest tests/integration/ -v --cov=src --cov-fail-under=60`
+
+주의:
+- CI와 별도로, 로컬 검증 정책은 프로젝트 가상환경(`.venv/bin/python`) 기준을 유지한다.
 
 근거: `.github/workflows/ci.yml`
 

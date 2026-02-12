@@ -114,6 +114,7 @@ def main() -> None:
 
     from src.common.contracts import get_contract, validate_required_columns
     from src.common.job_params import JobParams
+    from src.common.window_defaults import inject_pipeline_a_default_incremental_window
     from src.io.pipeline_state_io import (
         STATE_FAILURE,
         STATE_SUCCESS,
@@ -127,8 +128,15 @@ def main() -> None:
     from src.transforms.dq_guardrail import DQTableConfig
 
     spark = SparkSession.builder.getOrCreate()
+    pipeline_state_table = f"{args.catalog}.gold.pipeline_state"
+    pipeline_contract = get_contract("gold.pipeline_state")
+    initial_state = _load_current_state(
+        spark,
+        pipeline_state_table,
+        "pipeline_a",
+    )
 
-    params = JobParams.from_mapping(
+    params_payload = inject_pipeline_a_default_incremental_window(
         {
             "run_mode": args.run_mode,
             "start_ts": args.start_ts,
@@ -137,6 +145,10 @@ def main() -> None:
             "date_kst_end": args.date_kst_end,
             "run_id": args.run_id,
         },
+        last_processed_end=initial_state.last_processed_end if initial_state else None,
+    )
+    params = JobParams.from_mapping(
+        params_payload,
         pipeline_name="pipeline_a",
     )
 
@@ -174,13 +186,6 @@ def main() -> None:
 
     dq_rows: list[dict] = []
     exception_rows: list[dict] = []
-    pipeline_state_table = f"{args.catalog}.gold.pipeline_state"
-    pipeline_contract = get_contract("gold.pipeline_state")
-    initial_state = _load_current_state(
-        spark,
-        pipeline_state_table,
-        "pipeline_a",
-    )
     zero_window_counts = parse_zero_window_counts(
         initial_state.dq_zero_window_counts if initial_state else None
     )
