@@ -19,6 +19,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from src.common.config_loader import find_repo_root, get_config_value  # noqa: E402
+from src.common.rule_mode_guard import enforce_prod_strict_rule_mode  # noqa: E402
 from src.io.spark_safety import safe_collect  # noqa: E402
 
 TASK_ALL = "all"
@@ -237,6 +238,13 @@ def main() -> None:
     repo_root = Path(args.repo_root)
     if repo_root.as_posix() not in sys.path:
         sys.path.insert(0, repo_root.as_posix())
+    enforce_prod_strict_rule_mode(
+        pipeline_name="pipeline_b",
+        task=getattr(args, "task", None),
+        rule_load_mode=args.rule_load_mode,
+        catalog=args.catalog,
+        repo_root=repo_root,
+    )
 
     from src.common.job_params import JobParams
     from src.common.window_defaults import inject_default_daily_backfill
