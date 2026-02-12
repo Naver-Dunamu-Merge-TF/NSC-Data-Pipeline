@@ -409,8 +409,8 @@ Planned:
 
 ### 9.2 CI 게이트 (Current)
 
-- Unit coverage gate: `python -m pytest tests/unit/ -v --cov=src --cov-fail-under=80`
-- Integration smoke: `python -m pytest tests/integration/ -v --cov=src --cov-fail-under=60`
+- Unit gate: `python -m pytest tests/unit/ -v -x`
+- L2 combined coverage gate: `python -m pytest tests/unit/ tests/integration/ -v --cov=src --cov-fail-under=80`
 
 주의:
 - CI와 별도로, 로컬 검증 정책은 프로젝트 가상환경(`.venv/bin/python`) 기준을 유지한다.

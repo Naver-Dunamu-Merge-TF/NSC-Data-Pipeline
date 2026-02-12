@@ -126,8 +126,8 @@ Testing strategy
  -  **Idempotency**: Re-run → same result
 
 **Quality gates:**
- -  CI unit coverage gate: `tests/unit/` with `--cov-fail-under=80`
- -  CI integration smoke gate: `tests/integration/` with `--cov-fail-under=60`
+ -  CI unit gate: `tests/unit/` (pass/fail, no coverage threshold)
+ -  CI L2 combined coverage gate: `tests/unit/ tests/integration/` with `--cov-fail-under=80`
  -  Merge gate: Databricks Dev E2E (L3) idempotency checks pass
 
 See `.specs/project_specs.md` and `.github/workflows/ci.yml` for current test and CI details.
