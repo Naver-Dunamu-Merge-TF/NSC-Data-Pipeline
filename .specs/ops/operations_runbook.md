@@ -27,6 +27,7 @@ Last updated: 2026-02-12
 | Silver | 매일 00:00 (`0 0 0 * * ?`) | 3600s | 2회, 5분 간격 |
 | B | 매일 00:20 (`0 20 0 * * ?`) | 3600s | 각 task별 2회, 5분 간격 |
 | C | 매일 00:35 (`0 35 0 * * ?`) | 3600s | 2회, 5분 간격 |
+| BadRecords Cleanup | 매월 1일 00:50 (`0 50 0 1 * ?`) | 3600s | 2회, 5분 간격 |
 
 공통 실행 파라미터:
 - `run_mode`: `incremental | backfill`
@@ -237,8 +238,22 @@ HAVING COUNT(*) > 1;
 
 - 보존 정책: 180일
 - 정리 주기: 월 1회
+- 기본 경로: Databricks Workflow `bad_records_retention_cleanup` (scheduled)
+- 수동 SQL은 fallback 절차로만 사용
 
-정리 SQL:
+Dry-run 실행(권장 점검):
+```bash
+databricks bundle run bad_records_retention_cleanup -t <dev|prod> \
+  --params dry_run=true,retention_days=180
+```
+
+Execute 실행(수동 트리거):
+```bash
+databricks bundle run bad_records_retention_cleanup -t <dev|prod> \
+  --params dry_run=false,retention_days=180
+```
+
+Fallback SQL (job 비가용 시):
 ```sql
 DELETE FROM ${catalog}.silver.bad_records
 WHERE detected_date_kst < date_sub(current_date(), 180);
