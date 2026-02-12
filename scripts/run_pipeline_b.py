@@ -29,6 +29,7 @@ TASK_FINALIZE_SUCCESS = "finalize_success"
 TASK_FINALIZE_FAILURE = "finalize_failure"
 ENGINE_MODE_LEGACY = "legacy"
 ENGINE_MODE_SPARK = "spark"
+SPARK_SESSION_TIMEZONE = "UTC"
 MAX_PIPELINE_STATE_ROWS = 1
 MAX_DQ_STATUS_ROWS = 100_000
 MAX_WALLET_SNAPSHOT_ROWS = 2_000_000
@@ -168,6 +169,29 @@ def _write_gold_rows(
     )
 
 
+def _write_gold_df(
+    *,
+    catalog: str,
+    table_name: str,
+    df,
+) -> None:
+    if df is None or df.rdd.isEmpty():
+        return
+    from src.common.contracts import get_contract, validate_required_columns
+    from src.io.gold_io import write_gold_delta
+
+    contract = get_contract(table_name)
+    validate_required_columns(df.columns, contract)
+    short_name = table_name.split(".", maxsplit=1)[1]
+    aligned_df = _align_to_contract(df, contract)
+    write_gold_delta(
+        aligned_df,
+        f"{catalog}.gold.{short_name}",
+        table_name=table_name,
+        mode="overwrite",
+    )
+
+
 def _load_dq_tags_by_date(spark, dq_table: str) -> dict[date, list[str]]:
     dq_tags_by_date: dict[date, list[str]] = {}
     if not spark.catalog.tableExists(dq_table):
@@ -287,6 +311,7 @@ def main() -> None:
     from src.io.pipeline_state_io import STATE_FAILURE, STATE_SUCCESS
     from src.io.rule_loader import load_runtime_rules
     from src.io.upstream_readiness import assert_pipeline_ready
+    from src.jobs.pipeline_b_spark import transform_pipeline_b_tables_spark
     from src.transforms.ledger_controls import (
         build_admin_tx_search,
         build_ops_ledger_pairing_quality_daily,
@@ -297,12 +322,9 @@ def main() -> None:
     )
 
     spark = SparkSession.builder.getOrCreate()
+    spark.conf.set("spark.sql.session.timeZone", SPARK_SESSION_TIMEZONE)
     engine_mode = getattr(args, "engine_mode", ENGINE_MODE_LEGACY)
-    if engine_mode == ENGINE_MODE_SPARK:
-        raise NotImplementedError(
-            "pipeline_b spark engine path is not implemented yet; use --engine-mode legacy"
-        )
-    if engine_mode != ENGINE_MODE_LEGACY:
+    if engine_mode not in {ENGINE_MODE_LEGACY, ENGINE_MODE_SPARK}:
         raise ValueError(f"Unsupported engine mode: {engine_mode!r}")
 
     params_payload = inject_default_daily_backfill(
@@ -382,142 +404,213 @@ def main() -> None:
 
         silver_schema = f"{args.catalog}.silver"
         bronze_schema = f"{args.catalog}.bronze"
+        run_recon = task in {TASK_ALL, TASK_RECON}
+        run_supply_ops = task in {TASK_ALL, TASK_SUPPLY_OPS}
 
-        wallet_snapshots = [
-            row.asDict(recursive=True)
-            for row in safe_collect(
-                spark.table(f"{silver_schema}.wallet_snapshot"),
-                max_rows=MAX_WALLET_SNAPSHOT_ROWS,
-                context="pipeline_b:wallet_snapshot",
+        if engine_mode == ENGINE_MODE_SPARK:
+            target_date_values = sorted(set(target_dates))
+            max_target_date = max(target_date_values)
+            wallet_snapshot_df = spark.table(f"{silver_schema}.wallet_snapshot").filter(
+                F.col("snapshot_date_kst").isin(target_date_values)
             )
-        ]
-        ledger_entries = [
-            row.asDict(recursive=True)
-            for row in safe_collect(
-                spark.table(f"{silver_schema}.ledger_entries"),
-                max_rows=MAX_LEDGER_ENTRIES_ROWS,
-                context="pipeline_b:ledger_entries",
+            ledger_entries_df = spark.table(f"{silver_schema}.ledger_entries").filter(
+                F.col("event_date_kst") <= F.lit(max_target_date)
             )
-        ]
-        payment_orders: list[dict] = []
-        if task in {TASK_ALL, TASK_SUPPLY_OPS}:
-            payment_orders = [
+            payment_orders_df = (
+                spark.table(f"{bronze_schema}.payment_orders_raw")
+                if run_supply_ops
+                else None
+            )
+
+            dq_status_df = None
+            dq_table = f"{silver_schema}.dq_status"
+            if spark.catalog.tableExists(dq_table):
+                dq_status_df = spark.table(dq_table).filter(
+                    F.col("date_kst").isin(target_date_values)
+                )
+
+            spark_outputs = transform_pipeline_b_tables_spark(
+                wallet_snapshot_df=wallet_snapshot_df,
+                ledger_entries_df=ledger_entries_df,
+                payment_orders_df=payment_orders_df,
+                dq_status_df=dq_status_df,
+                target_dates=target_date_values,
+                run_id=params.run_id,
+                rules=rules,
+                run_recon=run_recon,
+                run_supply_ops=run_supply_ops,
+            )
+            _write_gold_df(
+                catalog=args.catalog,
+                table_name="gold.recon_daily_snapshot_flow",
+                df=spark_outputs.recon_df,
+            )
+            _write_gold_df(
+                catalog=args.catalog,
+                table_name="gold.ledger_supply_balance_daily",
+                df=spark_outputs.supply_df,
+            )
+            _write_gold_df(
+                catalog=args.catalog,
+                table_name="gold.ops_payment_failure_daily",
+                df=spark_outputs.ops_failure_df,
+            )
+            _write_gold_df(
+                catalog=args.catalog,
+                table_name="gold.ops_payment_refund_daily",
+                df=spark_outputs.ops_refund_df,
+            )
+            _write_gold_df(
+                catalog=args.catalog,
+                table_name="gold.ops_ledger_pairing_quality_daily",
+                df=spark_outputs.pairing_quality_df,
+            )
+            _write_gold_df(
+                catalog=args.catalog,
+                table_name="gold.admin_tx_search",
+                df=spark_outputs.admin_tx_search_df,
+            )
+            _write_gold_df(
+                catalog=args.catalog,
+                table_name="gold.exception_ledger",
+                df=spark_outputs.exception_df,
+            )
+        else:
+            wallet_snapshots = [
                 row.asDict(recursive=True)
                 for row in safe_collect(
-                    spark.table(f"{bronze_schema}.payment_orders_raw"),
-                    max_rows=MAX_PAYMENT_ORDERS_ROWS,
-                    context="pipeline_b:payment_orders_raw",
+                    spark.table(f"{silver_schema}.wallet_snapshot"),
+                    max_rows=MAX_WALLET_SNAPSHOT_ROWS,
+                    context="pipeline_b:wallet_snapshot",
                 )
             ]
-
-        dq_tags_by_date = _load_dq_tags_by_date(spark, f"{silver_schema}.dq_status")
-
-        recon_rows: list[dict] = []
-        supply_rows: list[dict] = []
-        ops_failure_rows: list[dict] = []
-        ops_refund_rows: list[dict] = []
-        pairing_rows: list[dict] = []
-        admin_rows: list[dict] = []
-        exception_rows: list[dict] = []
-
-        for target_date in target_dates:
-            dq_tags = dq_tags_by_date.get(target_date)
-            if task in {TASK_ALL, TASK_RECON}:
-                recon_output = build_recon_snapshot_flow(
-                    wallet_snapshots,
-                    ledger_entries,
-                    target_date=target_date,
-                    run_id=params.run_id,
-                    rules=rules,
-                    dq_tags=dq_tags,
+            ledger_entries = [
+                row.asDict(recursive=True)
+                for row in safe_collect(
+                    spark.table(f"{silver_schema}.ledger_entries"),
+                    max_rows=MAX_LEDGER_ENTRIES_ROWS,
+                    context="pipeline_b:ledger_entries",
                 )
-                recon_rows.extend(recon_output.rows)
-                exception_rows.extend(recon_output.exceptions)
-
-            if task in {TASK_ALL, TASK_SUPPLY_OPS}:
-                supply_output = build_supply_balance_daily(
-                    wallet_snapshots,
-                    ledger_entries,
-                    target_date=target_date,
-                    run_id=params.run_id,
-                    rules=rules,
-                    dq_tags=dq_tags,
-                )
-                supply_rows.append(supply_output.row)
-                exception_rows.extend(supply_output.exceptions)
-
-                ops_failure_rows.extend(
-                    build_ops_payment_failure_daily(
-                        payment_orders,
-                        target_date=target_date,
-                        run_id=params.run_id,
+            ]
+            payment_orders: list[dict] = []
+            if run_supply_ops:
+                payment_orders = [
+                    row.asDict(recursive=True)
+                    for row in safe_collect(
+                        spark.table(f"{bronze_schema}.payment_orders_raw"),
+                        max_rows=MAX_PAYMENT_ORDERS_ROWS,
+                        context="pipeline_b:payment_orders_raw",
                     )
-                )
-                ops_refund_rows.extend(
-                    build_ops_payment_refund_daily(
-                        payment_orders,
-                        target_date=target_date,
-                        run_id=params.run_id,
-                    )
-                )
-                pairing_rows.append(
-                    build_ops_ledger_pairing_quality_daily(
+                ]
+
+            dq_tags_by_date = _load_dq_tags_by_date(spark, f"{silver_schema}.dq_status")
+
+            recon_rows: list[dict] = []
+            supply_rows: list[dict] = []
+            ops_failure_rows: list[dict] = []
+            ops_refund_rows: list[dict] = []
+            pairing_rows: list[dict] = []
+            admin_rows: list[dict] = []
+            exception_rows: list[dict] = []
+
+            for target_date in target_dates:
+                dq_tags = dq_tags_by_date.get(target_date)
+                if run_recon:
+                    recon_output = build_recon_snapshot_flow(
+                        wallet_snapshots,
                         ledger_entries,
                         target_date=target_date,
                         run_id=params.run_id,
-                        payment_orders=payment_orders,
+                        rules=rules,
+                        dq_tags=dq_tags,
                     )
-                )
-                admin_rows.extend(
-                    build_admin_tx_search(
+                    recon_rows.extend(recon_output.rows)
+                    exception_rows.extend(recon_output.exceptions)
+
+                if run_supply_ops:
+                    supply_output = build_supply_balance_daily(
+                        wallet_snapshots,
                         ledger_entries,
                         target_date=target_date,
                         run_id=params.run_id,
+                        rules=rules,
+                        dq_tags=dq_tags,
                     )
-                )
+                    supply_rows.append(supply_output.row)
+                    exception_rows.extend(supply_output.exceptions)
 
-        _write_gold_rows(
-            spark,
-            catalog=args.catalog,
-            table_name="gold.recon_daily_snapshot_flow",
-            rows=recon_rows,
-        )
-        _write_gold_rows(
-            spark,
-            catalog=args.catalog,
-            table_name="gold.ledger_supply_balance_daily",
-            rows=supply_rows,
-        )
-        _write_gold_rows(
-            spark,
-            catalog=args.catalog,
-            table_name="gold.ops_payment_failure_daily",
-            rows=ops_failure_rows,
-        )
-        _write_gold_rows(
-            spark,
-            catalog=args.catalog,
-            table_name="gold.ops_payment_refund_daily",
-            rows=ops_refund_rows,
-        )
-        _write_gold_rows(
-            spark,
-            catalog=args.catalog,
-            table_name="gold.ops_ledger_pairing_quality_daily",
-            rows=pairing_rows,
-        )
-        _write_gold_rows(
-            spark,
-            catalog=args.catalog,
-            table_name="gold.admin_tx_search",
-            rows=admin_rows,
-        )
-        _write_gold_rows(
-            spark,
-            catalog=args.catalog,
-            table_name="gold.exception_ledger",
-            rows=exception_rows,
-        )
+                    ops_failure_rows.extend(
+                        build_ops_payment_failure_daily(
+                            payment_orders,
+                            target_date=target_date,
+                            run_id=params.run_id,
+                        )
+                    )
+                    ops_refund_rows.extend(
+                        build_ops_payment_refund_daily(
+                            payment_orders,
+                            target_date=target_date,
+                            run_id=params.run_id,
+                        )
+                    )
+                    pairing_rows.append(
+                        build_ops_ledger_pairing_quality_daily(
+                            ledger_entries,
+                            target_date=target_date,
+                            run_id=params.run_id,
+                            payment_orders=payment_orders,
+                        )
+                    )
+                    admin_rows.extend(
+                        build_admin_tx_search(
+                            ledger_entries,
+                            target_date=target_date,
+                            run_id=params.run_id,
+                        )
+                    )
+
+            _write_gold_rows(
+                spark,
+                catalog=args.catalog,
+                table_name="gold.recon_daily_snapshot_flow",
+                rows=recon_rows,
+            )
+            _write_gold_rows(
+                spark,
+                catalog=args.catalog,
+                table_name="gold.ledger_supply_balance_daily",
+                rows=supply_rows,
+            )
+            _write_gold_rows(
+                spark,
+                catalog=args.catalog,
+                table_name="gold.ops_payment_failure_daily",
+                rows=ops_failure_rows,
+            )
+            _write_gold_rows(
+                spark,
+                catalog=args.catalog,
+                table_name="gold.ops_payment_refund_daily",
+                rows=ops_refund_rows,
+            )
+            _write_gold_rows(
+                spark,
+                catalog=args.catalog,
+                table_name="gold.ops_ledger_pairing_quality_daily",
+                rows=pairing_rows,
+            )
+            _write_gold_rows(
+                spark,
+                catalog=args.catalog,
+                table_name="gold.admin_tx_search",
+                rows=admin_rows,
+            )
+            _write_gold_rows(
+                spark,
+                catalog=args.catalog,
+                table_name="gold.exception_ledger",
+                rows=exception_rows,
+            )
 
         if task == TASK_ALL:
             _write_pipeline_state(
