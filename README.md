@@ -163,6 +163,7 @@ Databricks 런타임에서는 env/secret 모두 실패 시 fail-closed로 종료
 
 ## 참고 문서 (SSOT)
 
+- `.specs/architecture_guide.md` — 팀 온보딩용 아키텍처 가이드
 - `.specs/project_specs.md`
 - `.specs/data_contract.md`
 - `.specs/ops/operations_runbook.md`
