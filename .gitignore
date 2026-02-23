@@ -215,3 +215,4 @@ __marimo__/
 .env/
 spark-warehouse/
 .agents/logs/verification/
+.secrets/
