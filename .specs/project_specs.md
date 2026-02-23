@@ -10,6 +10,17 @@ Last updated: 2026-02-12
 > 모니터링 SSOT: `.specs/ops/azure_monitoring_integration_plan.md`  
 > 결정 로그: `.specs/decision_open_items.md`
 
+## Workstream Reference Index (GOV-006)
+
+`.roadmap/implementation_roadmap.md` 기준 Workstream별 핵심 참조를 아래처럼 고정한다.
+
+| Workstream | Roadmap reference | Primary SSOT docs |
+|---|---|---|
+| `WS-SEC` | `.roadmap/implementation_roadmap.md` | `.specs/cloud/cloud_migration_rebuild_plan.md`, `.specs/ops/cutover_preflight_exit_template.md`, `.specs/decision_open_items.md` |
+| `WS-MON` | `.roadmap/implementation_roadmap.md` | `.specs/ops/azure_monitoring_integration_plan.md`, `.specs/ops/operations_runbook.md` |
+| `WS-CUT` | `.roadmap/implementation_roadmap.md` | `.specs/ops/cutover_preflight_exit_template.md`, `.specs/cloud/cloud_migration_rebuild_plan.md` |
+| `WS-GOV` | `.roadmap/implementation_roadmap.md` | `.specs/project_specs.md`, `.specs/data_contract.md`, `.specs/decision_open_items.md` |
+
 ---
 
 ## 0) 문서 상태 (Current / Planned)
@@ -455,5 +466,5 @@ Planned:
 
 1. 운영 증적 축적: `bootstrap_catalog`/`bad_records_retention_cleanup` 정기 실행 로그를 기준선으로 누적
 2. 룰 변경 거버넌스(runbook 절차) 운영 증적 축적 및 정기 점검
-3. `data_contract.md`와 `project_specs.md`의 Current/Planned 표기를 동일 기준으로 유지
+3. `.specs/data_contract.md`와 `.specs/project_specs.md`의 Current/Planned 표기를 동일 기준으로 유지
 4. v2 모니터링 확장 준비(테이블 기반 알림: `dq_status`, `exception_ledger`, `pipeline_state`, stale/drop 억제)

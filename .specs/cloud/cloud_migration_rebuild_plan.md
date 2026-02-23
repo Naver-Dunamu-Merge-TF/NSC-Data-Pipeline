@@ -2,6 +2,17 @@
 
 Last updated: 2026-02-12
 
+## Workstream Reference Index (GOV-006)
+
+`.roadmap/implementation_roadmap.md`와 정렬되는 Workstream 참조 인덱스:
+
+| Workstream | Roadmap reference | Primary SSOT docs |
+|---|---|---|
+| `WS-SEC` | `.roadmap/implementation_roadmap.md` | `.specs/cloud/cloud_migration_rebuild_plan.md`, `.specs/ops/cutover_preflight_exit_template.md`, `.specs/decision_open_items.md` |
+| `WS-MON` | `.roadmap/implementation_roadmap.md` | `.specs/ops/azure_monitoring_integration_plan.md`, `.specs/ops/operations_runbook.md` |
+| `WS-CUT` | `.roadmap/implementation_roadmap.md` | `.specs/ops/cutover_preflight_exit_template.md`, `.specs/cloud/cloud_migration_rebuild_plan.md` |
+| `WS-GOV` | `.roadmap/implementation_roadmap.md` | `.specs/project_specs.md`, `.specs/data_contract.md`, `.specs/decision_open_items.md` |
+
 ## 1. 목적
 
 이 문서는 현재 테스트 중심 Azure Databricks 환경을 빠르게 생성/폐기하면서 기능을 검증하고,
