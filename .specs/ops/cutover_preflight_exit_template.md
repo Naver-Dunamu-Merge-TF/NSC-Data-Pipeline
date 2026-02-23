@@ -1,6 +1,6 @@
 # Cutover Preflight / Exit Criteria Template
 
-Last updated: 2026-02-11  
+Last updated: 2026-02-23  
 Reference: `.specs/cloud/cloud_migration_rebuild_plan.md`
 
 ## 1. Cutover Metadata
@@ -16,6 +16,9 @@ Reference: `.specs/cloud/cloud_migration_rebuild_plan.md`
 - [ ] 구독/RG/워크스페이스/스토리지 이름 재확인
 - [ ] UC 권한(`USE CATALOG`, `USE SCHEMA`, `SELECT`, `MODIFY`) 검증
 - [ ] Secret 주입 상태(`salt`, 토큰) 검증
+- [ ] SEC binding window(`sec003_sec004_binding_window.sh`) 실행 계획/파라미터 확정
+- [ ] 서버리스 SEC 검증 job(`sec_access_secret_binding_window`) 배포 및 Job ID 확인
+- [ ] SEC L3 검증 스크립트(`verify_sec003_sec004_l3.sh`) 폴링(20s)/타임아웃(10m) 기준 확인
 - [ ] 파이프라인 파라미터(`run_mode`, `start_ts`, `end_ts`, `run_id`) 확정
 - [ ] 기존 Workflows 정지/재개 순서 확정
 - [ ] Bootstrap job(`bootstrap_catalog`) 배포 완료 확인
@@ -46,6 +49,8 @@ Reference: `.specs/cloud/cloud_migration_rebuild_plan.md`
 | Pipeline Silver | `silver.wallet_snapshot/ledger_entries/order_events/order_items/products` 생성 + `silver.bad_records` 적재/검증 완료 |  |  |
 | Pipeline B/C | Gold 핵심 테이블 생성 완료 |  |  |
 | Rule SSOT | `gold.dim_rule_scd2` 존재 + current rule 유효성 통과 |  |  |
+| SEC-003 | 서버리스에서 UC ACL + external location R/W 검증 성공 |  |  |
+| SEC-004 | KV-backed secret scope read + rotation(pre/post hash diff) 검증 성공 |  |  |
 | Pipeline B Rerun | 동일 `run_id` 재실행 성공 + `exception_ledger` 6-key 중복 0건 |  |  |
 | Incremental | `T_cutover_utc` 이후 누락/중복 없음 |  |  |
 | State | `gold.pipeline_state.last_run_id` 최신 반영 |  |  |

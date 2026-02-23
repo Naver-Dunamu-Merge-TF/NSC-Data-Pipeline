@@ -1,7 +1,7 @@
 # 결정 필요 항목 목록 (Open Decisions)
 
 작성일: 2026-02-05
-업데이트: 2026-02-12
+업데이트: 2026-02-23
 
 ## 목적
 구현 중 **명확히 결정되지 않았거나 가정으로 처리한 항목**을 기록하고,
@@ -438,3 +438,21 @@
 - 근거:
   - 코드: `scripts/run_pipeline_a.py`, `src/common/window_defaults.py`
   - 테스트: `tests/unit/test_window_defaults.py`
+
+### D-043 SEC-003/SEC-004 서버리스 검증 창 운영
+- 상태: **결정됨(2026-02-23)**
+- 배경:
+  - G1의 SEC-003(UC/external location 권한)와 SEC-004(KV-backed secret scope/rotation)가 동시 블로커로 남아 있다.
+  - 기존 잡 클러스터 경로는 quota/cluster start 이슈로 검증 지연이 발생할 수 있다.
+- 결정:
+  1) SEC-003/SEC-004 검증은 `sec_access_secret_binding_window` 서버리스 잡으로 고정한다.
+  2) Secret scope 전환은 `ledger-analytics-dev` 동일 이름을 유지하되 backend를 `AZURE_KEYVAULT`로 재생성한다.
+  3) 권한 적용 모델은 그룹 principal + 검증자 임시 principal 병행으로 고정한다.
+  4) 검증 루프는 20초 polling, 10분 timeout, 게이트당 최대 2회 재시도 후 Infra+Platform 에스컬레이션으로 고정한다.
+  5) 회전 검증은 동일 창에서 pre/post 2회 실행하고 `secret_sha256` diff를 증적으로 남긴다.
+- 영향:
+  - G1 SEC 단계에서 서버리스 기준의 재현 가능한 실행/증적 경로가 생긴다.
+  - `run_as` 서비스 프린시플 전환은 SEC-005 범위로 유지해 변경 범위를 분리한다.
+- 근거:
+  - 코드: `databricks.yml`, `scripts/phase7/sec003_sec004_binding_window.sh`, `scripts/phase7/verify_sec003_sec004_l3.sh`
+  - 문서: `.specs/ops/operations_runbook.md`, `.specs/ops/cutover_preflight_exit_template.md`, `.roadmap/implementation_roadmap.md`

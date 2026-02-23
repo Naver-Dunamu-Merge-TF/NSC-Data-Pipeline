@@ -539,6 +539,56 @@ resources:
               - "--table-name"
               - "{{job.parameters.table_name}}"
 
+    sec_access_secret_binding_window:
+      name: data-pipeline-sec-binding-${bundle.target}
+      max_concurrent_runs: 1
+      timeout_seconds: 1200
+      performance_target: STANDARD
+      parameters:
+        - name: run_id
+          default: ""
+        - name: catalog
+          default: ${var.catalog}
+        - name: external_location
+          default: team4_adls_test
+        - name: base_path
+          default: abfss://2dt-final-team4-adls-test@nscstdevw4mlu8.dfs.core.windows.net
+        - name: secret_scope
+          default: ledger-analytics-dev
+        - name: secret_key
+          default: salt_user_key
+      environments:
+        - environment_key: sec_binding_default
+          spec:
+            environment_version: "2"
+      tasks:
+        - task_key: sec003_probe
+          environment_key: sec_binding_default
+          spark_python_task:
+            python_file: scripts/phase7/sec003_uc_external_location_probe.py
+            parameters:
+              - "--run-id"
+              - "{{job.parameters.run_id}}"
+              - "--catalog"
+              - "{{job.parameters.catalog}}"
+              - "--external-location"
+              - "{{job.parameters.external_location}}"
+              - "--base-path"
+              - "{{job.parameters.base_path}}"
+        - task_key: sec004_probe
+          depends_on:
+            - task_key: sec003_probe
+          environment_key: sec_binding_default
+          spark_python_task:
+            python_file: scripts/phase7/sec004_secret_scope_probe.py
+            parameters:
+              - "--run-id"
+              - "{{job.parameters.run_id}}"
+              - "--secret-scope"
+              - "{{job.parameters.secret_scope}}"
+              - "--secret-key"
+              - "{{job.parameters.secret_key}}"
+
     e2e_full_pipeline:
       name: data-pipeline-e2e-full-${bundle.target}
       max_concurrent_runs: 1

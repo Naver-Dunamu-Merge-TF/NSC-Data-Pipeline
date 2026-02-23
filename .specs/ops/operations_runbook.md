@@ -1,6 +1,6 @@
 # Operations Runbook (Pipeline A/Silver/B/C)
 
-Last updated: 2026-02-12
+Last updated: 2026-02-23
 
 ## 1. Scope
 
@@ -55,6 +55,33 @@ Pipeline B task 구성:
 운영/지원(On-demand) jobs:
 - `bootstrap_catalog` (운영 bootstrap: schema/table 생성/검증, 데이터 적재 제외)
 - `sync_dim_rule_scd2` (룰 테이블 반영)
+- `sec_access_secret_binding_window` (SEC-003/004 서버리스 검증 window)
+
+### 2.1 SEC-003/SEC-004 Serverless Binding Window
+
+목적:
+- UC 권한/External Location 접근(SEC-003)과 KV-backed Secret Scope 검증(SEC-004)을 동일 변경 창에서 처리한다.
+
+실행 순서:
+1. 권한/시크릿 바인딩 적용:
+```bash
+scripts/phase7/sec003_sec004_binding_window.sh
+```
+2. 서버리스 L3 검증 + 20초 폴링(10분 타임아웃):
+```bash
+scripts/phase7/verify_sec003_sec004_l3.sh
+```
+
+운영 규칙:
+- 검증 게이트별 재시도 최대 2회, 초과 시 Infra + Platform 에스컬레이션 후 다음 단계 진행 금지
+- Rotation 검증은 동일 창에서 pre/post 2회 실행하고 `secret_sha256` 변경을 증적으로 남긴다
+- `run_as` 서비스 프린시플 전환은 SEC-005 범위로 분리한다
+- 자동 리뷰 루프는 `Implementer -> Spec Review -> Code Quality Review -> Verification` 순서로 적용한다
+
+증적:
+- `.agents/logs/verification/YYYYMMDD_sec003_uc_external_location_serverless.md`
+- `.agents/logs/verification/YYYYMMDD_sec004_kv_scope_rotation_serverless.md`
+- `.agents/logs/verification/YYYYMMDD_sec003_sec004_binding_window.log`
 
 ## 3. Monitoring Model (Azure Monitoring v1)
 
