@@ -456,3 +456,20 @@
 - 근거:
   - 코드: `databricks.yml`, `scripts/phase7/sec003_sec004_binding_window.sh`, `scripts/phase7/verify_sec003_sec004_l3.sh`
   - 문서: `.specs/ops/operations_runbook.md`, `.specs/ops/cutover_preflight_exit_template.md`, `.roadmap/implementation_roadmap.md`
+
+### D-044 SEC-005 run_as 서비스 프린시플 식별자/ACL 주체 매핑
+- 상태: **미결정(2026-02-23)**
+- 배경:
+  - SEC-005 실행에서 `run_as` 전환 대상 principal 값이 SSOT 문서에 고정되어 있지 않다.
+  - `<service-principal-name-or-app-id>` placeholder로 apply 시도 시 `Invalid user` 오류가 발생했다.
+- 영향:
+  - `run_as` 전환 및 UC 최소권한 ACL 실제 적용을 완료할 수 없다.
+  - SEC-005 L3 smoke 결과가 20초 polling/600초 timeout 내 수렴하지 않아 G1 블로커가 유지된다.
+- 결정 필요:
+  1) Databricks workspace에 onboarding된 서비스 프린시플 식별자(app id 또는 principal name)를 확정한다.
+  2) SEC-005 ACL 적용 대상 주체(서비스 프린시플 단독 vs 보조 검증 주체 병행)를 확정한다.
+- 임시 운영 기준:
+  - 코드/스크립트는 준비 완료 상태로 유지하고, 확정 principal 제공 후 `sec005_run_as_acl_apply.sh --apply`를 재실행한다.
+- 근거:
+  - 증적: `.agents/logs/verification/20260223_sec005_run_as_acl.md`
+  - 로그: `.agents/logs/verification/20260223_sec005_run_as_acl_apply_attempt.log`

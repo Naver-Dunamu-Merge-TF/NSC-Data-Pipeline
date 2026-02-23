@@ -12,6 +12,8 @@ variables:
     description: Runtime rule table name for Pipeline A/B/Silver
   rule_seed_path:
     description: Fallback seed path for Pipeline A/B/Silver
+  run_as_principal:
+    description: Service principal used as run_as execution identity
 targets:
   dev:
     default: true
@@ -21,6 +23,7 @@ targets:
       rule_load_mode: fallback
       rule_table: gold.dim_rule_scd2
       rule_seed_path: mock_data/fixtures/dim_rule_scd2.json
+      run_as_principal: "<sec005-dev-service-principal>"
 
   prod:
     variables:
@@ -29,6 +32,7 @@ targets:
       rule_load_mode: strict
       rule_table: gold.dim_rule_scd2
       rule_seed_path: mock_data/fixtures/dim_rule_scd2.json
+      run_as_principal: "<sec005-prod-service-principal>"
 
 resources:
   jobs:
@@ -36,6 +40,8 @@ resources:
       name: data-pipeline-a-${bundle.target}
       max_concurrent_runs: 1
       timeout_seconds: 3600
+      run_as:
+        service_principal_name: ${var.run_as_principal}
       schedule:
         quartz_cron_expression: "0 0/10 * * * ?"
         timezone_id: Asia/Seoul
@@ -104,6 +110,8 @@ resources:
       name: data-pipeline-b-${bundle.target}
       max_concurrent_runs: 1
       timeout_seconds: 3600
+      run_as:
+        service_principal_name: ${var.run_as_principal}
       schedule:
         quartz_cron_expression: "0 20 0 * * ?"
         timezone_id: Asia/Seoul
@@ -271,6 +279,8 @@ resources:
       name: data-pipeline-c-${bundle.target}
       max_concurrent_runs: 1
       timeout_seconds: 3600
+      run_as:
+        service_principal_name: ${var.run_as_principal}
       schedule:
         quartz_cron_expression: "0 35 0 * * ?"
         timezone_id: Asia/Seoul
@@ -327,6 +337,8 @@ resources:
       name: data-pipeline-silver-${bundle.target}
       max_concurrent_runs: 1
       timeout_seconds: 3600
+      run_as:
+        service_principal_name: ${var.run_as_principal}
       schedule:
         quartz_cron_expression: "0 0 0 * * ?"
         timezone_id: Asia/Seoul
