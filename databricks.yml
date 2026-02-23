@@ -16,8 +16,8 @@ targets:
   dev:
     default: true
     variables:
-      catalog: hive_metastore
-      cluster_policy_id: "000C31E193543DF5"
+      catalog: nsc_dbw_dev_7405610275478542
+      cluster_policy_id: "0004CF01E53A5F6F"
       rule_load_mode: fallback
       rule_table: gold.dim_rule_scd2
       rule_seed_path: mock_data/fixtures/dim_rule_scd2.json
@@ -64,11 +64,11 @@ resources:
       job_clusters:
         - job_cluster_key: policy_single_node
           new_cluster:
-            spark_version: "16.4.x-scala2.12"
+            spark_version: "15.4.x-scala2.12"
             autoscale:
               min_workers: 1
               max_workers: 2
-            node_type_id: Standard_DS3_v2
+            node_type_id: Standard_DS4_v2
             policy_id: ${var.cluster_policy_id}
       tasks:
         - task_key: run_pipeline_a
@@ -132,11 +132,11 @@ resources:
       job_clusters:
         - job_cluster_key: policy_single_node
           new_cluster:
-            spark_version: "16.4.x-scala2.12"
+            spark_version: "15.4.x-scala2.12"
             autoscale:
               min_workers: 1
               max_workers: 2
-            node_type_id: Standard_DS3_v2
+            node_type_id: Standard_DS4_v2
             policy_id: ${var.cluster_policy_id}
       tasks:
         - task_key: pipeline_b_recon
@@ -293,11 +293,11 @@ resources:
       job_clusters:
         - job_cluster_key: policy_single_node
           new_cluster:
-            spark_version: "16.4.x-scala2.12"
+            spark_version: "15.4.x-scala2.12"
             autoscale:
               min_workers: 1
               max_workers: 2
-            node_type_id: Standard_DS3_v2
+            node_type_id: Standard_DS4_v2
             policy_id: ${var.cluster_policy_id}
       tasks:
         - task_key: run_pipeline_c
@@ -355,11 +355,11 @@ resources:
       job_clusters:
         - job_cluster_key: policy_single_node
           new_cluster:
-            spark_version: "16.4.x-scala2.12"
+            spark_version: "15.4.x-scala2.12"
             autoscale:
               min_workers: 1
               max_workers: 2
-            node_type_id: Standard_DS3_v2
+            node_type_id: Standard_DS4_v2
             policy_id: ${var.cluster_policy_id}
       tasks:
         - task_key: run_pipeline_silver
@@ -409,11 +409,11 @@ resources:
       job_clusters:
         - job_cluster_key: policy_single_node
           new_cluster:
-            spark_version: "16.4.x-scala2.12"
+            spark_version: "15.4.x-scala2.12"
             autoscale:
               min_workers: 1
               max_workers: 2
-            node_type_id: Standard_DS3_v2
+            node_type_id: Standard_DS4_v2
             policy_id: ${var.cluster_policy_id}
       tasks:
         - task_key: cleanup_bad_records
@@ -443,11 +443,11 @@ resources:
       job_clusters:
         - job_cluster_key: policy_cluster
           new_cluster:
-            spark_version: "16.4.x-scala2.12"
+            spark_version: "15.4.x-scala2.12"
             autoscale:
               min_workers: 1
               max_workers: 2
-            node_type_id: Standard_DS3_v2
+            node_type_id: Standard_DS4_v2
             policy_id: ${var.cluster_policy_id}
       tasks:
         - task_key: setup_e2e_env
@@ -473,11 +473,11 @@ resources:
       job_clusters:
         - job_cluster_key: policy_single_node
           new_cluster:
-            spark_version: "16.4.x-scala2.12"
+            spark_version: "15.4.x-scala2.12"
             autoscale:
               min_workers: 1
               max_workers: 2
-            node_type_id: Standard_DS3_v2
+            node_type_id: Standard_DS4_v2
             policy_id: ${var.cluster_policy_id}
       tasks:
         - task_key: cleanup_e2e_env
@@ -494,18 +494,14 @@ resources:
       name: data-pipeline-bootstrap-${bundle.target}
       max_concurrent_runs: 1
       timeout_seconds: 600
-      job_clusters:
-        - job_cluster_key: policy_single_node
-          new_cluster:
-            spark_version: "16.4.x-scala2.12"
-            autoscale:
-              min_workers: 1
-              max_workers: 2
-            node_type_id: Standard_DS3_v2
-            policy_id: ${var.cluster_policy_id}
+      performance_target: STANDARD
+      environments:
+        - environment_key: bootstrap_default
+          spec:
+            environment_version: "2"
       tasks:
         - task_key: bootstrap_schemas_and_tables
-          job_cluster_key: policy_single_node
+          environment_key: bootstrap_default
           spark_python_task:
             python_file: scripts/bootstrap_catalog.py
             parameters:
@@ -524,11 +520,11 @@ resources:
       job_clusters:
         - job_cluster_key: policy_single_node
           new_cluster:
-            spark_version: "16.4.x-scala2.12"
+            spark_version: "15.4.x-scala2.12"
             autoscale:
               min_workers: 1
               max_workers: 2
-            node_type_id: Standard_DS3_v2
+            node_type_id: Standard_DS4_v2
             policy_id: ${var.cluster_policy_id}
       tasks:
         - task_key: sync_rule_table
@@ -569,11 +565,11 @@ resources:
       job_clusters:
         - job_cluster_key: policy_single_node
           new_cluster:
-            spark_version: "16.4.x-scala2.12"
+            spark_version: "15.4.x-scala2.12"
             autoscale:
               min_workers: 1
               max_workers: 2
-            node_type_id: Standard_DS3_v2
+            node_type_id: Standard_DS4_v2
             policy_id: ${var.cluster_policy_id}
       tasks:
         - task_key: sync_rules
