@@ -1,15 +1,16 @@
 # 실행 로드맵 (Workstream 기반, 운영완결형, 증적기반 DoD)
 
-Last updated: 2026-02-12
+Last updated: 2026-02-23
 
 ## 1) 목적과 범위
 
 이 로드맵은 기존 Phase 체크리스트를 Workstream 중심으로 재편한 실행 기준이다.
 문서 SSOT 기준의 미구현/미완료 항목을 추적하며, 완료 표시는 검증 증적이 있을 때만 허용한다.
 
-운영 전제(2026-02-12 확정):
+운영 전제(2026-02-23 재검증):
 - 인프라 리소스는 인프라 담당이 사전 프로비저닝한 자산을 사용한다.
 - 데이터 파이프라인 팀은 신규 리소스 생성 대신 검증/바인딩/전환 실행에 집중한다.
+- 2026-02-23 인프라 handoff 재검증 증적은 `.agents/logs/verification/20260223_infra_handoff_validation.md`를 기준으로 한다.
 
 포함 범위:
 - Secure Rebuild: cloud rebuild 12/12.1 미완료 항목
@@ -59,14 +60,24 @@ Last updated: 2026-02-12
 
 | task_id | status | priority | depends_on | source_doc | dod | verification_level | evidence_path | owner | target_gate | 세부 태스크 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| SEC-001 | InProgress | P0 | - | `.specs/cloud/cloud_migration_rebuild_plan.md` | 인프라팀 handoff 자산 목록(workspace, storage, UC, external location, KV, SP)을 확정하고 운영 잠금 버전을 기록 | L3 | `.agents/logs/verification/20260212_sec_handoff_inventory.md` | Platform + DataEng | G1 | 1) handoff 인벤토리 템플릿 확정<br>2) 자산 식별값/권한 주체 수집<br>3) 운영 잠금 버전/변경이력 기록 |
-| SEC-002 | InProgress | P0 | SEC-001 | `.specs/cloud/cloud_migration_rebuild_plan.md#12.1`, `.specs/cloud/phase7_cloud_setup_status.md` | `audit_cloud_state.sh`로 자산 실측값 수집 후 handoff 목록과 불일치 0건 | L3 | `.agents/logs/verification/20260212_phase7_audit_rebuild_check.log` | DataEng | G1 | 1) audit 스크립트 실행 및 로그 수집<br>2) handoff 목록 대비 diff 리포트 작성<br>3) 불일치 0건 확인/재검증 |
-| SEC-003 | NotStarted | P0 | SEC-002 | `.specs/ops/cutover_preflight_exit_template.md` | UC 권한(`USE CATALOG/SCHEMA`, `SELECT`, `MODIFY`) 및 external location 접근 검증 통과 | L3 | `.agents/logs/verification/20260212_sec_uc_acl_external_location.log` | DataEng + Infra | G1 | 1) UC grant 매트릭스 확정<br>2) 권한 검증 SQL 실행<br>3) external location read/write 검증 |
-| SEC-004 | Blocked | P0 | SEC-002 | `.specs/cloud/cloud_migration_rebuild_plan.md`, `.specs/decision_open_items.md` | Key Vault-backed Secret Scope 접근 검증 및 rotation 절차 확인 완료 | L3 | `.agents/logs/verification/20260212_sec_kv_scope_binding.log` | Infra | G1 | 1) KV-Secret Scope 연결 정보 수령<br>2) secret read 테스트 수행<br>3) rotation 절차/주기 검증 |
-| SEC-005 | Blocked | P0 | SEC-003, SEC-004 | `.specs/decision_open_items.md` (D-018), `.specs/cloud/cloud_migration_rebuild_plan.md` | 서비스 프린시플 `run_as` 전환 + UC ACL 최소권한 적용 + 실행 성공 | L3 | `.agents/logs/verification/20260212_sec_run_as_transition.log` | Infra + DataEng | G1 | 1) `run_as` 주체 전환 설정 적용<br>2) 최소권한 ACL 재적용<br>3) A/B/C 실행 스모크 검증 |
-| SEC-006 | InProgress | P1 | SEC-002, SEC-004 | `.specs/cloud/cloud_migration_rebuild_plan.md#12.1`, `configs/dev.yaml`, `configs/common.yaml` | `configs/dev.yaml`/`configs/common.yaml`의 host/id/catalog/external_location/base_path/secret 값이 실측값과 일치 | L1 | `.agents/logs/verification/20260212_sec_config_binding_diff.md` | DataEng | G1 | 1) 실측값 기준 config 비교표 작성<br>2) 불일치 항목 수정안 반영<br>3) 수정 후 재비교 diff 0건 확인 |
+| SEC-001 | InProgress | P0 | - | `.specs/cloud/cloud_migration_rebuild_plan.md` | 인프라팀 handoff 자산 목록(workspace, storage, UC, external location, KV, SP)을 확정하고 운영 잠금 버전을 기록 | L3 | `.agents/logs/verification/20260223_infra_handoff_validation.md` | Platform + DataEng | G1 | 1) handoff 인벤토리 템플릿 확정<br>2) 자산 식별값/권한 주체 수집 및 증적 로그 적재(`20260223_infra_cli_audit.log`)<br>3) 운영 잠금 버전/변경이력 기록(미완료) |
+| SEC-003 | NotStarted | P0 | SEC-001 | `.specs/ops/cutover_preflight_exit_template.md` | UC 권한(`USE CATALOG/SCHEMA`, `SELECT`, `MODIFY`) 및 external location 접근 검증 통과 | L3 | `.agents/logs/verification/20260212_sec_uc_acl_external_location.log` | DataEng + Infra | G1 | 1) UC grant 매트릭스 확정<br>2) 권한 검증 SQL 실행<br>3) external location read/write 검증 |
+| SEC-004 | Blocked | P0 | SEC-001 | `.specs/cloud/cloud_migration_rebuild_plan.md`, `.specs/decision_open_items.md` | Key Vault-backed Secret Scope 접근 검증 및 rotation 절차 확인 완료 | L3 | `.agents/logs/verification/20260223_infra_handoff_validation.md` | Infra | G1 | 1) KV-backed scope `ledger-analytics-dev` 생성/연결(현재 scope 0건)<br>2) secret read 테스트 수행<br>3) rotation 절차/주기 검증 |
+| SEC-005 | Blocked | P0 | SEC-003, SEC-004 | `.specs/decision_open_items.md` (D-018), `.specs/cloud/cloud_migration_rebuild_plan.md` | 서비스 프린시플 `run_as` 전환 + UC ACL 최소권한 적용 + 실행 성공 | L3 | `.agents/logs/verification/20260223_infra_handoff_validation.md` | Infra + DataEng | G1 | 1) `run_as` 주체 전환 설정 적용<br>2) 최소권한 ACL 재적용<br>3) A/B/C 실행 스모크 검증 |
+| SEC-006 | InProgress | P1 | SEC-001, SEC-004 | `.specs/cloud/cloud_migration_rebuild_plan.md#12.1`, `configs/dev.yaml`, `configs/common.yaml` | `configs/dev.yaml`/`configs/common.yaml`의 host/id/catalog/external_location/base_path/secret 값이 실측값과 일치 | L1 | `.agents/logs/verification/20260223_infra_handoff_validation.md` | DataEng | G1 | 1) 실측값 기준 config 비교표 갱신(2026-02-23)<br>2) 불일치(catalog/secret_scope/cluster_policy) 수정 반영<br>3) 수정 후 재비교 diff 0건 확인 |
 | SEC-007 | NotStarted | P1 | SEC-003, SEC-006 | `.specs/cloud/cloud_migration_rebuild_plan.md#12.1` | Pipeline A 최소 1회 스모크 성공 + `silver.dq_status` 또는 Gold 산출물 생성 확인 | L3 | `.agents/logs/verification/20260212_sec_pipeline_a_smoke.log` | DataEng | G1 | 1) 대상 파라미터 확정 후 A 실행<br>2) `silver.dq_status`/Gold 산출 쿼리 검증<br>3) 실패 시 원인/재실행 기록 |
 | SEC-008 | NotStarted | P0 | SEC-003, SEC-004, SEC-005, SEC-007 | `.specs/cloud/cloud_migration_rebuild_plan.md`, `.specs/ops/cutover_preflight_exit_template.md` | G1 승인 체크리스트 전체 완료(권한/시크릿/설정/스모크) | L3 | `.agents/logs/verification/20260212_sec_gate_g1_signoff.md` | Platform | G1 | 1) G1 체크리스트 통합 점검<br>2) Infra/Platform/DataEng 합동 서명<br>3) 게이트 승인 로그 확정 |
+
+#### 2026-02-23 인프라 재검증 스냅샷
+
+| 구분 | 상태 | 근거 |
+|---|---|---|
+| Azure 리소스 프로비저닝/조회 | PASS | `.agents/logs/verification/20260223_infra_cli_audit.log` |
+| SQL AAD-only 및 Private Access | PASS | `az sql server ad-only-auth get`, `az network private-endpoint-connection list` |
+| ACR/KV/ADLS/Bastion private posture | PASS | `publicNetworkAccess=Disabled` + private endpoint 승인 |
+| Postgres/Event Hubs private-only posture | FAIL | `publicNetworkAccess=Enabled` 확인 |
+| Databricks Workspace 인증/접근 | PASS | `databricks auth describe`, `databricks current-user me` |
+| Databricks bootstrap 정합(catalog/scope/policy) | FAIL | catalog 불일치, scope 0건, 정책 미존재 |
 
 ### 3.2 WS-MON (Azure Monitoring v1 Rollout)
 
@@ -162,3 +173,4 @@ Last updated: 2026-02-12
 - `.specs/ops/cutover_preflight_exit_template.md`
 - `.specs/ops/operations_runbook.md`
 - `.specs/decision_open_items.md`
+- `.agents/logs/verification/20260223_infra_handoff_validation.md`
