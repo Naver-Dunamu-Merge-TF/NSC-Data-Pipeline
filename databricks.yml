@@ -23,7 +23,7 @@ targets:
       rule_load_mode: fallback
       rule_table: gold.dim_rule_scd2
       rule_seed_path: mock_data/fixtures/dim_rule_scd2.json
-      run_as_principal: "<sec005-dev-service-principal>"
+      run_as_principal: "eb69a479-7a7d-4e2b-9cba-05d2262d8d3c"
 
   prod:
     variables:
