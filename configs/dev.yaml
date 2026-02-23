@@ -3,7 +3,7 @@ environment: dev
 databricks:
   workspace_host: https://adb-1234567890123456.7.azuredatabricks.net
   workspace_id: "57710310442212"
-  catalog: 2dt_final_team4_databricks_test
+  catalog: nsc_dbw_dev_7405610275478542
   bronze_schema: bronze
   silver_schema: silver
   gold_schema: gold

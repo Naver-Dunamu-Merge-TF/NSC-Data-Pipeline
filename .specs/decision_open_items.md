@@ -360,7 +360,7 @@
 - 상태: **결정됨(2026-02-12)**
 - 배경:
   - `configs/common.yaml`, `configs/dev.yaml`, `configs/prod.yaml`가 존재하지만 런타임 스크립트가 직접 소비하지 않았다.
-  - 런타임 스크립트에 catalog(`2dt_final_team4_databricks_test`), secret_scope, secret_key가 하드코딩되어 있었다.
+  - 런타임 스크립트에 catalog(`nsc_dbw_dev_7405610275478542`), secret_scope, secret_key가 하드코딩되어 있었다.
 - 영향:
   - 환경 전환(dev/prod) 시 설정 드리프트와 배포 실수 가능성이 증가한다.
 - 결정:

@@ -13,7 +13,7 @@ Last updated: 2026-02-12
 
 - `databricks.workspace_host`: `https://adb-1234567890123456.7.azuredatabricks.net`
 - `databricks.workspace_id`: `57710310442212`
-- `databricks.catalog`: `2dt_final_team4_databricks_test`
+- `databricks.catalog`: `nsc_dbw_dev_7405610275478542`
 - `databricks.cluster_policy_id`: `00023C6641CF09E4`
 - `storage.external_location`: `team4_adls_test`
 - `storage.base_path`: `abfss://2dt-final-team4-adls-test@2dtfinalteam4storagetest.dfs.core.windows.net`
@@ -28,7 +28,7 @@ Last updated: 2026-02-12
 ### 2.3 `scripts/phase7/setup_minimal_cloud.sh` 기본값
 
 - `EXT_LOCATION_NAME`: `team4_adls_test`
-- `STORAGE_CREDENTIAL_NAME`: `2dt_final_team4_databricks_test`
+- `STORAGE_CREDENTIAL_NAME`: `team4_adls_test_cred`
 - `SCOPE_NAME`: `ledger-analytics-dev`
 - `SCOPE_KEY`: `salt_user_key`
 - `PIPELINE_A_JOB_ID`: `57710310442212`

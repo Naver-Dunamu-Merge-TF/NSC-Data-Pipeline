@@ -29,7 +29,7 @@ Last updated: 2026-02-12
 
 - 2026-02-09 기준 기존 dev 테스트 리소스는 삭제된 상태로 간주한다.
 - 신규 dev 테스트 리소스 재생성 여부와 실제 식별값은 `scripts/phase7/audit_cloud_state.sh` 증적 기준으로 재확정이 필요하다.
-- `configs/dev.yaml`에는 dev baseline 값(`workspace_id=57710310442212`, `catalog=2dt_final_team4_databricks_test`, `external_location=team4_adls_test`, `base_path=abfss://2dt-final-team4-adls-test@2dtfinalteam4storagetest.dfs.core.windows.net`)이 기록되어 있으며, 실환경 일치 여부는 검증 필요 상태다.
+- `configs/dev.yaml`에는 dev baseline 값(`workspace_id=57710310442212`, `catalog=nsc_dbw_dev_7405610275478542`, `external_location=team4_adls_test`, `base_path=abfss://2dt-final-team4-adls-test@2dtfinalteam4storagetest.dfs.core.windows.net`)이 기록되어 있으며, 실환경 일치 여부는 검증 필요 상태다.
 - `scripts/phase7/setup_minimal_cloud.sh` 기본값(`SCOPE_NAME=ledger-analytics-dev`, `SCOPE_KEY=salt_user_key`, `PIPELINE_A_JOB_ID=57710310442212`)은 재적용 기준값이며, 적용 완료 여부는 검증 필요 상태다.
 
 재빌드 시 복원/확정 필요 항목:

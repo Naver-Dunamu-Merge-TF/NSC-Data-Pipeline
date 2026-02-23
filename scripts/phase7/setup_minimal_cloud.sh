@@ -78,7 +78,8 @@ export DATABRICKS_HOST
 export DATABRICKS_TOKEN
 
 EXT_LOCATION_NAME="${EXT_LOCATION_NAME:-team4_adls_test}"
-STORAGE_CREDENTIAL_NAME="${STORAGE_CREDENTIAL_NAME:-2dt_final_team4_databricks_test}"
+STORAGE_CREDENTIAL_NAME="${STORAGE_CREDENTIAL_NAME:-team4_adls_test_cred}"
+CATALOG_NAME="${CATALOG_NAME:-nsc_dbw_dev_7405610275478542}"
 EXT_LOCATION_URL="abfss://${CONTAINER_NAME}@${STORAGE_ACCOUNT}.dfs.core.windows.net/"
 
 SCOPE_NAME="${SCOPE_NAME:-ledger-analytics-dev}"
@@ -142,7 +143,7 @@ for schema_name in bronze silver gold; do
   ]
 }
 JSON
-  databricks grants update schema "2dt_final_team4_databricks_test.${schema_name}" --json @/tmp/grants_schema_user.json >/dev/null
+  databricks grants update schema "${CATALOG_NAME}.${schema_name}" --json @/tmp/grants_schema_user.json >/dev/null
   echo "schema grant upserted: ${schema_name}"
 done
 
