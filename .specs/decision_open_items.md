@@ -1,7 +1,7 @@
 # 결정 필요 항목 목록 (Open Decisions)
 
 작성일: 2026-02-05
-업데이트: 2026-02-23
+업데이트: 2026-02-24
 
 ## 목적
 구현 중 **명확히 결정되지 않았거나 가정으로 처리한 항목**을 기록하고,
@@ -477,3 +477,40 @@
   - 증적: `.agents/logs/verification/20260223_d044_run_as_principal_resolution.md`
   - 기존 SEC-005 이력: `.agents/logs/verification/20260223_sec005_run_as_acl.md`
   - 로그: `.agents/logs/verification/20260223_sec005_run_as_acl_apply.log`
+
+### D-045 SEC-005 run_as 서비스 프린시플의 bundle workspace artifact 접근 모델
+- 상태: **결정됨(2026-02-24)**
+- 배경:
+  - A/Silver/B/C를 서버리스로 전환한 뒤 L3 smoke에서 모든 task가 `INTERNAL_ERROR/FAILED`로 종료되었다.
+  - 공통 실패 메시지는 run_as SP(`eb69a479-7a7d-4e2b-9cba-05d2262d8d3c`)가 user workspace bundle 파일 경로(`/Workspace/Users/2dt026@msacademy.msai.kr/.bundle/...`)를 읽지 못한다는 내용이다.
+- 결정:
+  1) 배포 경로는 기존 user workspace bundle 경로를 유지한다.
+  2) run_as SP(`eb69a479-7a7d-4e2b-9cba-05d2262d8d3c`)에 bundle files 디렉터리(`/Workspace/Users/2dt026@msacademy.msai.kr/.bundle/data-pipeline/dev/files`) `CAN_RUN` 권한을 명시적으로 부여한다.
+  3) 권한 반영 후 smoke 재실행 시 기존 `Cannot read the python file ...` 실패 시그니처가 사라지는 것을 수용 기준으로 고정한다.
+- 영향:
+  - workspace artifact read 권한 블로커(D-045)는 해소되었다.
+  - 잔여 블로커는 smoke 600초 수렴 실패이며, 관측 원인은 A/Silver runtime rule table load 실패 후 retry 대기로 인한 상위 run `RUNNING` 지속이다.
+- 근거:
+  - `.agents/logs/verification/20260223_all_pipeline_serverless_smoke.md`
+  - `.agents/logs/verification/20260223_all_pipeline_serverless_smoke_status_serverless4_smoke_20260224T001540Z.json`
+  - `.agents/logs/verification/20260224_d045_workspace_acl_resolution.md`
+  - `.agents/logs/verification/20260224_d045_smoke_failure_root_cause.md`
+
+### D-046 SEC-005 smoke convergence 복구 표준(단계형 smoke + deterministic fail-fast)
+- 상태: **결정됨(2026-02-24)**
+- 배경:
+  - D-045로 workspace artifact read 권한 블로커는 제거됐지만 A/Silver `gold.dim_rule_scd2` 룰 로딩 실패가 남아 있었다.
+  - 이 실패가 B/C fail-closed와 retry pending(`Waiting for cluster`)으로 이어지며 parent run이 `RUNNING` 상태로 남아 600초 smoke timeout을 반복했다.
+- 결정:
+  1) SEC-005 smoke 표준 실행 순서를 `sync_dim_rule_scd2 -> A/Silver -> B/C` 단계형으로 고정한다.
+  2) smoke 시작 전 preflight(`verify_sec005_rule_preflight.sh`)에서 run_as SP ACL(`USE_CATALOG/USE_SCHEMA/SELECT/MODIFY`)과 `gold.dim_rule_scd2`/`gold.pipeline_state` 상태를 검증한다.
+  3) `verify_sec005_smoke_l3.sh`에 deterministic fail-fast를 도입하되 기본값은 `off`로 유지한다.
+  4) D-046 복구 smoke(`run_sec005_smoke_recovery.sh`)에서는 `--fail-fast-deterministic on`을 강제해 결정적 실패 + retry pending 패턴을 즉시 cancel/fail-fast 처리한다.
+  5) SEC-005 L3 공식 게이트 판정은 staged smoke 기준으로 고정하고, 기존 4개 병렬 smoke는 보조 관측 신호로 유지한다.
+- 영향:
+  - B/C 연쇄 fail-closed를 사전 차단하고, retry pending으로 인한 `RUNNING` 고착/600초 timeout 리스크를 낮춘다.
+  - smoke 수렴 실패 시 원인 분류(ACL, rule table integrity, deterministic failure signature)가 기계적으로 분리된다.
+- 근거:
+  - 계획: `docs/plans/2026-02-24-d045-smoke-convergence-recovery.md`
+  - 스크립트: `scripts/phase7/verify_sec005_rule_preflight.sh`, `scripts/phase7/run_sec005_smoke_recovery.sh`, `scripts/phase7/verify_sec005_smoke_l3.sh`
+  - 증적: `.agents/logs/verification/20260224_d046_smoke_recovery_kickoff.md`

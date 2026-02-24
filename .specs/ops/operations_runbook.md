@@ -1,6 +1,6 @@
 # Operations Runbook (Pipeline A/Silver/B/C)
 
-Last updated: 2026-02-23
+Last updated: 2026-02-24
 
 ## 1. Scope
 
@@ -28,6 +28,12 @@ Last updated: 2026-02-23
 | B | 매일 00:20 (`0 20 0 * * ?`) | 3600s | 각 task별 2회, 5분 간격 |
 | C | 매일 00:35 (`0 35 0 * * ?`) | 3600s | 2회, 5분 간격 |
 | BadRecords Cleanup | 매월 1일 00:50 (`0 50 0 1 * ?`) | 3600s | 2회, 5분 간격 |
+
+서버리스 컴퓨트 기준(2026-02-24 업데이트):
+- A/Silver/B/C는 `performance_target: STANDARD` + job `environments` + task `environment_key`를 사용한다.
+- A/Silver/B/C는 `job_clusters`/task `job_cluster_key`를 사용하지 않는다.
+- `run_as` 서비스 프린시플이 bundle workspace artifact 경로를 읽을 수 있어야 smoke가 수렴한다.
+  - 관련 블로커/증적: `.agents/logs/verification/20260223_all_pipeline_serverless_smoke.md`
 
 공통 실행 파라미터:
 - `run_mode`: `incremental | backfill`
@@ -248,6 +254,42 @@ databricks bundle run pipeline_c_analytics -t dev \
 주의:
 - Pipeline C는 `date_kst` 파티션 overwrite(`replaceWhere`) 전략이다.
 - 백필 범위를 좁혀 재실행해야 불필요한 파티션 교체를 줄일 수 있다.
+
+### 6.5 Smoke Convergence 실패 (SEC-005 / D-046)
+
+증상:
+1. A/Silver에서 `gold.dim_rule_scd2` 로딩 실패 발생
+2. B/C가 `pipeline_silver` readiness fail-closed로 연쇄 실패
+3. retry attempt가 `PENDING` + `Waiting for cluster`에 머물며 smoke 600초 timeout
+
+표준 복구 절차(단계형 smoke):
+1. `sync_dim_rule_scd2` + preflight를 포함한 staged runner 실행
+```bash
+bash scripts/phase7/run_sec005_smoke_recovery.sh \
+  --target <dev|prod-secure> \
+  --date-kst <YYYY-MM-DD> \
+  --run-id <logical-run-id> \
+  --run-as-principal <sp-app-id> \
+  --poll-seconds 20 \
+  --timeout-seconds 600
+```
+2. Stage-A/Silver PASS 후에만 Stage-B/C를 진행한다(스크립트가 순서를 강제).
+3. verifier는 `--fail-fast-deterministic on`으로 결정적 실패 + retry pending 패턴을 감지하면 즉시 cancel/fail-fast 한다.
+
+사전검증(preflight) 기준:
+1. run_as SP ACL: `USE_CATALOG`, `USE_SCHEMA`, `SELECT`, `MODIFY`
+2. `gold.dim_rule_scd2` 존재 + `is_current=true` 무결성
+3. `gold.pipeline_state` 존재
+
+필수 증적:
+1. preflight 결과 JSON: `20260224_d046_smoke_preflight_<run>.json`
+2. stage 결과 JSON: `20260224_d046_smoke_stage_as_<run>.json`, `20260224_d046_smoke_stage_bc_<run>.json`
+3. 요약 JSON: `20260224_d046_smoke_recovery_summary_<run>.json`
+4. 검증 로그: `.agents/logs/verification/20260224_d046_smoke_recovery_verification.md`
+
+운영 판정 규칙:
+1. SEC-005 L3 공식 게이트는 staged smoke 결과를 사용한다.
+2. 기존 4개 병렬 smoke는 정보성 보조 관측으로만 사용한다.
 
 ## 7. Re-run And Idempotency Guardrails
 
