@@ -29,6 +29,7 @@ TASK_FINALIZE_SUCCESS = "finalize_success"
 TASK_FINALIZE_FAILURE = "finalize_failure"
 SPARK_SESSION_TIMEZONE = "UTC"
 MAX_PIPELINE_STATE_ROWS = 1
+MAX_NON_EMPTY_CHECK_ROWS = 1
 
 VALID_TASKS = {
     TASK_ALL,
@@ -126,7 +127,16 @@ def _write_gold_df(
     table_name: str,
     df,
 ) -> None:
-    if df is None or df.rdd.isEmpty():
+    if df is None:
+        return
+    has_rows = bool(
+        safe_collect(
+            df.limit(MAX_NON_EMPTY_CHECK_ROWS),
+            max_rows=MAX_NON_EMPTY_CHECK_ROWS,
+            context=f"pipeline_b:non_empty_check:{table_name}",
+        )
+    )
+    if not has_rows:
         return
     from src.common.contracts import get_contract, validate_required_columns
     from src.io.gold_io import write_gold_delta

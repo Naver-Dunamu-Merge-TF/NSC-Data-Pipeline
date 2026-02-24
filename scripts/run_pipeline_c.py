@@ -174,26 +174,22 @@ def main() -> None:
             run_id=params.run_id,
             salt=resolved_salt,
         )
-        result_df = result_df.persist()
-        try:
-            row_count = result_df.count()
-            if row_count > 0:
-                contract = get_contract("gold.fact_payment_anonymized")
-                df = _align_to_contract(result_df, contract)
-                target_table = f"{args.catalog}.gold.fact_payment_anonymized"
-                write_gold_delta(
-                    df,
-                    target_table,
-                    table_name="gold.fact_payment_anonymized",
-                    mode="overwrite",
-                )
-                print(
-                    f"Upserted {row_count} rows into {target_table} (run_id={params.run_id})"
-                )
-            else:
-                print("No rows generated for gold.fact_payment_anonymized")
-        finally:
-            result_df.unpersist()
+        row_count = result_df.count()
+        if row_count > 0:
+            contract = get_contract("gold.fact_payment_anonymized")
+            df = _align_to_contract(result_df, contract)
+            target_table = f"{args.catalog}.gold.fact_payment_anonymized"
+            write_gold_delta(
+                df,
+                target_table,
+                table_name="gold.fact_payment_anonymized",
+                mode="overwrite",
+            )
+            print(
+                f"Upserted {row_count} rows into {target_table} (run_id={params.run_id})"
+            )
+        else:
+            print("No rows generated for gold.fact_payment_anonymized")
 
         success_state = apply_pipeline_state(
             pipeline_name="pipeline_c",

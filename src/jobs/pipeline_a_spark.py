@@ -5,7 +5,6 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Iterable
 
-from pyspark import StorageLevel
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
@@ -297,79 +296,65 @@ def build_dq_status_spark(
     elif config.source_table == "bronze.payment_orders_raw":
         needed_columns.update(("amount", "status"))
 
-    prepared_df = _ensure_columns(records_df, needed_columns).persist(
-        StorageLevel.MEMORY_AND_DISK
+    prepared_df = _ensure_columns(records_df, needed_columns)
+
+    entry_type_rule = select_rule(rules, domain="silver", metric="entry_type_allowed")
+    status_rule = select_rule(rules, domain="silver", metric="payment_status_allowed")
+
+    allowed_entry_types = (
+        set(entry_type_rule.allowed_values)
+        if entry_type_rule and entry_type_rule.allowed_values
+        else None
     )
-    try:
-        entry_type_rule = select_rule(
-            rules, domain="silver", metric="entry_type_allowed"
-        )
-        status_rule = select_rule(
-            rules, domain="silver", metric="payment_status_allowed"
-        )
+    allowed_statuses = (
+        set(status_rule.allowed_values)
+        if status_rule and status_rule.allowed_values
+        else None
+    )
 
-        allowed_entry_types = (
-            set(entry_type_rule.allowed_values)
-            if entry_type_rule and entry_type_rule.allowed_values
-            else None
-        )
-        allowed_statuses = (
-            set(status_rule.allowed_values)
-            if status_rule and status_rule.allowed_values
-            else None
-        )
+    freshness_rule = select_rule(rules, domain="dq", metric="freshness_sec")
+    dup_rule = (
+        select_rule(rules, domain="dq", metric=config.dup_rule_metric)
+        if config.dup_rule_metric
+        else None
+    )
+    completeness_rule = select_rule(
+        rules, domain="dq", metric="completeness_zero_windows"
+    )
+    contract_rule = select_rule(rules, domain="dq", metric="contract_bad_records_rate")
 
-        freshness_rule = select_rule(rules, domain="dq", metric="freshness_sec")
-        dup_rule = (
-            select_rule(rules, domain="dq", metric=config.dup_rule_metric)
-            if config.dup_rule_metric
-            else None
-        )
-        completeness_rule = select_rule(
-            rules, domain="dq", metric="completeness_zero_windows"
-        )
-        contract_rule = select_rule(
-            rules, domain="dq", metric="contract_bad_records_rate"
-        )
+    freshness_sec = _compute_freshness_sec(
+        prepared_df,
+        timestamp_fields=config.freshness_fields,
+        now_ts=now_ts,
+        context=f"pipeline_a_spark:freshness:{config.source_table}",
+    )
+    dup_rate = _compute_duplicate_rate(prepared_df, key_fields=config.dup_key_fields)
 
-        freshness_sec = _compute_freshness_sec(
-            prepared_df,
-            timestamp_fields=config.freshness_fields,
-            now_ts=now_ts,
-            context=f"pipeline_a_spark:freshness:{config.source_table}",
-        )
-        dup_rate = _compute_duplicate_rate(
-            prepared_df, key_fields=config.dup_key_fields
-        )
-
-        valid_expr = _valid_record_expr(
-            prepared_df,
-            source_table=config.source_table,
-            required_columns=required_columns,
-            allowed_entry_types=allowed_entry_types,
-            allowed_statuses=allowed_statuses,
-        )
-        count_metrics_df = prepared_df.agg(
-            F.count(F.lit(1)).alias("event_count"),
-            F.sum(F.when(valid_expr, F.lit(1)).otherwise(F.lit(0))).alias(
-                "valid_count"
-            ),
-        )
-        count_metrics_rows = safe_collect(
-            count_metrics_df,
-            max_rows=_METRIC_COLLECT_MAX_ROWS,
-            context=f"pipeline_a_spark:counts:{config.source_table}",
-        )
-        count_payload = (
-            count_metrics_rows[0].asDict(recursive=True) if count_metrics_rows else {}
-        )
-        event_count = int(count_payload.get("event_count") or 0)
-        valid_count = int(count_payload.get("valid_count") or 0)
-        invalid_count = max(event_count - valid_count, 0)
-        zero_windows = previous_zero_windows + 1 if event_count == 0 else 0
-        bad_records_rate = (invalid_count / event_count) if event_count else 0.0
-    finally:
-        prepared_df.unpersist()
+    valid_expr = _valid_record_expr(
+        prepared_df,
+        source_table=config.source_table,
+        required_columns=required_columns,
+        allowed_entry_types=allowed_entry_types,
+        allowed_statuses=allowed_statuses,
+    )
+    count_metrics_df = prepared_df.agg(
+        F.count(F.lit(1)).alias("event_count"),
+        F.sum(F.when(valid_expr, F.lit(1)).otherwise(F.lit(0))).alias("valid_count"),
+    )
+    count_metrics_rows = safe_collect(
+        count_metrics_df,
+        max_rows=_METRIC_COLLECT_MAX_ROWS,
+        context=f"pipeline_a_spark:counts:{config.source_table}",
+    )
+    count_payload = (
+        count_metrics_rows[0].asDict(recursive=True) if count_metrics_rows else {}
+    )
+    event_count = int(count_payload.get("event_count") or 0)
+    valid_count = int(count_payload.get("valid_count") or 0)
+    invalid_count = max(event_count - valid_count, 0)
+    zero_windows = previous_zero_windows + 1 if event_count == 0 else 0
+    bad_records_rate = (invalid_count / event_count) if event_count else 0.0
 
     freshness_severity = _evaluate_severity(freshness_sec, freshness_rule)
     dup_severity = _evaluate_severity(dup_rate, dup_rule)
