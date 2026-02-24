@@ -48,6 +48,17 @@ Last updated: 2026-02-24
 - `G3`: Cutover Rehearsal Passed (dry-run/backfill/incremental/rollback 리허설 통과)
 - `G4`: Prod Cutover + Hypercare Complete
 
+### 2.4 G2 execution bundle status
+
+| bundle_id | status | evidence | note |
+|---|---|---|---|
+| G2-0 | Done | WS-SEC `SEC-008` is conditional `InProgress`; D-049 conditional approval memo: `.agents/logs/verification/20260224_sec007_sec008_conditional_approval.md`; G2-0 unlock memo: `.agents/logs/verification/20260224_g2_0_gate_unlock.md` | Unlock scope is limited to starting Monitoring v1 work. |
+
+G2-0 precedence rule:
+- `G2-0 Done` allows only WS-MON start activities while `SEC-008` is conditional `InProgress` under D-049.
+- This rule does not imply `SEC-008 Done` and does not imply final G1 signoff.
+- WS-MON `depends_on=SEC-008` remains effective for closure; G2-0 only unlocks start execution.
+
 ## 3) Workstream Backlog
 
 ### 3.1 WS-SEC (Security And Pre-Provisioned Resource Binding)
