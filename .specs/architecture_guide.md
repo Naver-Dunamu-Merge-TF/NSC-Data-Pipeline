@@ -274,15 +274,16 @@ run_tracking → run_id 생성
 `gold.pipeline_state` 테이블 구조:
 ```
 pipeline_name         "pipeline_a" | "pipeline_silver" | "pipeline_b" | "pipeline_c"
+status                "success" | "failure"
 last_success_ts       마지막 성공 시각 (UTC)
 last_processed_end    마지막 처리 완료 윈도우 끝 (UTC) — B/C 하드 게이트가 이걸 체크
 last_run_id           마지막 실행 ID
 dq_zero_window_counts JSON 문자열 — A만 사용 (연속 빈 윈도우 카운트)
-status                "success" | "failure"
+updated_at            상태 갱신 시각 (UTC)
 ```
 
-성공 시: `last_success_ts = now`, `last_processed_end = 이번 윈도우 끝`
-실패 시: `last_success_ts = 기존값 유지`, `status = "failure"`
+성공 시: `status="success"`, `last_success_ts=now`, `last_processed_end=이번 윈도우 끝`, `last_run_id`/`updated_at` 갱신
+실패 시: `status="failure"`, `last_success_ts`/`last_processed_end` 유지, `last_run_id`/`updated_at` 갱신
 
 ### 안전장치
 

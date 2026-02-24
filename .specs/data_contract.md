@@ -460,6 +460,7 @@ Databricks에서 일일 대사(Δ잔고 = 순흐름)를 하기 위해서는 아�
 | 컬럼 | 타입(권장) | 필수 | 의미 |
 |---|---|---:|---|
 | `pipeline_name` | `string` | ✅ | 파이프라인 식별자(`pipeline_a/b/c/silver`) |
+| `status` | `string` | ✅(권장) | 마지막 실행 결과 상태(`success`, `failure`) |
 | `last_success_ts` | `timestamp` | ⭕️ | 마지막 성공 시각(UTC) |
 | `last_processed_end` | `timestamp` | ⭕️ | 마지막 성공 실행의 처리 종료 시각(UTC) |
 | `last_run_id` | `string` | ⭕️ | 마지막 실행 ID(성공/실패 포함) |
@@ -471,8 +472,9 @@ Databricks에서 일일 대사(Δ잔고 = 순흐름)를 하기 위해서는 아�
 - `(pipeline_name)` MERGE
 
 운영 규칙:
-- 성공 시 `last_success_ts`, `last_processed_end`, `last_run_id`, `updated_at`를 갱신한다.
-- 실패 시 `last_success_ts`, `last_processed_end`는 유지하고 `last_run_id`, `updated_at`만 갱신한다.
+- `status` 허용값은 `success`, `failure`만 허용한다.
+- 성공 시 `status='success'`, `last_success_ts`, `last_processed_end`, `last_run_id`, `updated_at`를 갱신한다.
+- 실패 시 `status='failure'`, `last_success_ts`, `last_processed_end`는 유지하고 `last_run_id`, `updated_at`만 갱신한다.
 
 ### 4.10 `gold.dim_rule_scd2` (룰 SSOT, SCD2)
 

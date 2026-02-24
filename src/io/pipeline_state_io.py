@@ -10,11 +10,13 @@ from src.io.merge_utils import merge_delta_table
 
 STATE_SUCCESS = "success"
 STATE_FAILURE = "failure"
+_VALID_PIPELINE_STATES = {STATE_SUCCESS, STATE_FAILURE}
 
 
 @dataclass(frozen=True)
 class PipelineStateRecord:
     pipeline_name: str
+    status: str
     last_success_ts: datetime | None
     last_processed_end: datetime | None
     last_run_id: str | None
@@ -24,6 +26,7 @@ class PipelineStateRecord:
     def as_dict(self) -> dict[str, Any]:
         return {
             "pipeline_name": self.pipeline_name,
+            "status": self.status,
             "last_success_ts": self.last_success_ts,
             "last_processed_end": self.last_processed_end,
             "last_run_id": self.last_run_id,
@@ -43,14 +46,49 @@ def _parse_datetime(value: Any) -> datetime | None:
     raise TypeError(f"Unsupported datetime value: {value!r}")
 
 
+def _normalize_status(value: Any, *, fallback: str | None = None) -> str:
+    if value is None or (isinstance(value, str) and not value.strip()):
+        if fallback is not None:
+            return fallback
+        raise ValueError("pipeline_state.status is required")
+    normalized = str(value).strip().lower()
+    if normalized not in _VALID_PIPELINE_STATES:
+        raise ValueError(f"invalid pipeline state status: {value}")
+    return normalized
+
+
+def _infer_legacy_status(
+    *,
+    last_success_ts: datetime | None,
+    updated_at: datetime | None,
+) -> str:
+    if (
+        last_success_ts is not None
+        and updated_at is not None
+        and updated_at == last_success_ts
+    ):
+        return STATE_SUCCESS
+    return STATE_FAILURE
+
+
 def parse_pipeline_state_record(payload: Mapping[str, Any]) -> PipelineStateRecord:
     pipeline_name = payload.get("pipeline_name")
     if not pipeline_name:
         raise ValueError("pipeline_name is required")
-    updated_at = _parse_datetime(payload.get("updated_at")) or now_utc()
+    last_success_ts = _parse_datetime(payload.get("last_success_ts"))
+    updated_at_raw = _parse_datetime(payload.get("updated_at"))
+    updated_at = updated_at_raw or now_utc()
+    status = _normalize_status(
+        payload.get("status"),
+        fallback=_infer_legacy_status(
+            last_success_ts=last_success_ts,
+            updated_at=updated_at_raw,
+        ),
+    )
     return PipelineStateRecord(
         pipeline_name=str(pipeline_name),
-        last_success_ts=_parse_datetime(payload.get("last_success_ts")),
+        status=status,
+        last_success_ts=last_success_ts,
         last_processed_end=_parse_datetime(payload.get("last_processed_end")),
         last_run_id=payload.get("last_run_id"),
         dq_zero_window_counts=payload.get("dq_zero_window_counts"),
@@ -93,13 +131,12 @@ def apply_pipeline_state(
     event_ts: datetime | None = None,
     dq_zero_window_counts: str | None = None,
 ) -> PipelineStateRecord:
-    status_normalized = status.strip().lower()
-    if status_normalized not in {STATE_SUCCESS, STATE_FAILURE}:
-        raise ValueError(f"invalid pipeline state status: {status}")
+    status_normalized = _normalize_status(status)
 
     ts = to_utc(event_ts) if event_ts is not None else now_utc()
     current = current_state or PipelineStateRecord(
         pipeline_name=pipeline_name,
+        status=STATE_FAILURE,
         last_success_ts=None,
         last_processed_end=None,
         last_run_id=None,
@@ -112,6 +149,7 @@ def apply_pipeline_state(
             raise ValueError("last_processed_end is required for success updates")
         return PipelineStateRecord(
             pipeline_name=pipeline_name,
+            status=STATE_SUCCESS,
             last_success_ts=ts,
             last_processed_end=to_utc(last_processed_end),
             last_run_id=run_id,
@@ -121,6 +159,7 @@ def apply_pipeline_state(
 
     return PipelineStateRecord(
         pipeline_name=pipeline_name,
+        status=STATE_FAILURE,
         last_success_ts=current.last_success_ts,
         last_processed_end=current.last_processed_end,
         last_run_id=run_id,

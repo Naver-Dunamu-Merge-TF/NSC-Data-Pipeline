@@ -5,6 +5,8 @@ from datetime import datetime
 import pytest
 
 from src.io.pipeline_state_io import (
+    STATE_FAILURE,
+    STATE_SUCCESS,
     PipelineStateRecord,
     apply_pipeline_state,
     parse_pipeline_state_record,
@@ -24,6 +26,7 @@ def test_apply_pipeline_state_success_sets_checkpoint_fields() -> None:
     )
     assert updated.pipeline_name == "pipeline_a"
     assert updated.last_run_id == "run-1"
+    assert updated.status == STATE_SUCCESS
     assert updated.last_processed_end is not None
     assert updated.last_success_ts is not None
 
@@ -31,6 +34,7 @@ def test_apply_pipeline_state_success_sets_checkpoint_fields() -> None:
 def test_apply_pipeline_state_failure_keeps_last_success_checkpoint() -> None:
     current = PipelineStateRecord(
         pipeline_name="pipeline_a",
+        status=STATE_SUCCESS,
         last_success_ts=datetime(2026, 2, 6, 0, 11, 0),
         last_processed_end=datetime(2026, 2, 6, 0, 10, 0),
         last_run_id="run-1",
@@ -47,12 +51,47 @@ def test_apply_pipeline_state_failure_keeps_last_success_checkpoint() -> None:
     assert failed.last_success_ts == current.last_success_ts
     assert failed.last_processed_end == current.last_processed_end
     assert failed.last_run_id == "run-2"
+    assert failed.status == STATE_FAILURE
     assert failed.dq_zero_window_counts == current.dq_zero_window_counts
 
 
 def test_parse_pipeline_state_record_requires_pipeline_name() -> None:
     with pytest.raises(ValueError):
         parse_pipeline_state_record({})
+
+
+def test_parse_pipeline_state_record_uses_status_fallback_for_legacy_rows() -> None:
+    parsed = parse_pipeline_state_record(
+        {
+            "pipeline_name": "pipeline_silver",
+            "last_success_ts": "2026-02-11T15:00:00Z",
+            "last_processed_end": "2026-02-11T15:00:00Z",
+            "last_run_id": "run-legacy",
+            "updated_at": "2026-02-11T15:00:00Z",
+        }
+    )
+    assert parsed.status == STATE_SUCCESS
+
+
+def test_apply_pipeline_state_rejects_invalid_status() -> None:
+    with pytest.raises(ValueError):
+        apply_pipeline_state(
+            pipeline_name="pipeline_a",
+            run_id="run-3",
+            status="unknown",
+            last_processed_end=datetime(2026, 2, 6, 0, 10, 0),
+        )
+
+
+def test_parse_pipeline_state_record_rejects_invalid_status() -> None:
+    with pytest.raises(ValueError):
+        parse_pipeline_state_record(
+            {
+                "pipeline_name": "pipeline_silver",
+                "status": "degraded",
+                "updated_at": "2026-02-11T15:00:00Z",
+            }
+        )
 
 
 def test_zero_window_count_helpers_roundtrip_and_sanitize() -> None:

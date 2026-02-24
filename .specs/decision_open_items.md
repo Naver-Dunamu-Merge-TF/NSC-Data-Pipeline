@@ -136,7 +136,7 @@
 
 ### D-020 `gold.pipeline_state` 실패 시 업데이트 규칙
 - 상태: **결정됨(2026-02-06, 개발단계)**
-- 결정: 성공 시 `last_success_ts`, `last_processed_end`, `last_run_id`를 모두 갱신하고, 실패 시 `last_success_ts`/`last_processed_end`는 유지하며 `last_run_id`, `updated_at`만 갱신
+- 결정: 성공 시 `status='success'`, `last_success_ts`, `last_processed_end`, `last_run_id`를 모두 갱신하고, 실패 시 `status='failure'`, `last_success_ts`/`last_processed_end`는 유지하며 `last_run_id`, `updated_at`만 갱신
 - 영향: 증분 재개 체크포인트는 마지막 성공 지점을 보존하고, 최근 실패 실행 ID는 추적 가능
 - 근거: `.specs/project_specs.md` 9.1, Phase 8 구현 정책
 
@@ -558,3 +558,28 @@
 - 근거:
   - `.agents/logs/verification/20260224_d046_smoke_recovery_summary_d046_smoke_srvless_retry3_20260224T033753Z.json`
   - `.agents/logs/verification/20260224_sec007_sec008_conditional_approval.md`
+
+### D-050 `gold.pipeline_state.status` 계약 정렬 및 배포 순서 잠금
+- 상태: **결정됨(2026-02-24)**
+- 배경:
+  - `gold.pipeline_state.status`를 ops-agent 감지/리포트 경로에서 사용 중이나, Data-pipeline 계약/런타임 write 경로는 해당 컬럼 정렬이 완전하지 않았다.
+  - 마이그레이션 전/후 혼재 구간에서 `status` 미존재 row 파싱 실패 또는 잘못된 상태 해석이 발생할 수 있다.
+- 결정:
+  1) 상태 전이 규칙을 `success|failure`로 고정한다.
+     - 성공 실행: `status='success'` + `last_success_ts`, `last_processed_end`, `last_run_id`, `updated_at` 갱신
+     - 실패 실행: `status='failure'` + `last_success_ts`, `last_processed_end` 유지(D-020), `last_run_id`, `updated_at` 갱신
+  2) 배포 순서를 고정한다: **schema migration apply -> 코드 배포 -> L3 검증**.
+     - migration apply 이전 런타임 코드 선배포 금지
+     - L2 실패 상태에서 L3 진행 금지
+  3) 기존 row backfill은 아래 결정적 규칙으로 수행한다.
+     - `status IS NULL` 대상:
+       - `last_success_ts IS NOT NULL AND updated_at = last_success_ts` 이면 `success`
+       - 그 외는 `failure`
+  4) 런타임 파서는 migration 이전 호환을 위해 `status` 미존재 row에 동일한 결정적 fallback 규칙을 적용한다.
+  5) 롤백 전략: DDL/UPDATE 실패 시 즉시 배포를 중단하고 후속 코드 배포를 진행하지 않는다.
+- 영향:
+  - 계약/코드/운영 쿼리(`pipeline_name, status, last_success_ts, last_processed_end, last_run_id`)가 동일 상태 모델을 공유한다.
+  - 실패 시 체크포인트 보존 정책(D-020)을 유지하면서, 최근 실행 결과 상태 추적이 가능해진다.
+- 근거:
+  - `docs/plans/2026-02-24-pipeline-state-status-contract-alignment.md`
+  - D-020 `gold.pipeline_state` 실패 시 업데이트 규칙

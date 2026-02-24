@@ -351,6 +351,7 @@ GOLD_CONTRACTS: dict[str, TableContract] = {
         name="gold.pipeline_state",
         columns=(
             ContractColumn("pipeline_name", "string", True),
+            ContractColumn("status", "string", False),
             ContractColumn("last_success_ts", "timestamp", False),
             ContractColumn("last_processed_end", "timestamp", False),
             ContractColumn("last_run_id", "string", False),

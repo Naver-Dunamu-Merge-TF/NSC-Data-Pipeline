@@ -357,8 +357,9 @@ Planned:
 
 ### 6.3 `pipeline_state` 갱신 규칙
 
-- 성공: `last_success_ts`, `last_processed_end`, `last_run_id`, `updated_at` 갱신
-- 실패: `last_success_ts`, `last_processed_end` 유지, `last_run_id`, `updated_at`만 갱신
+- 상태 허용값: `status IN ('success', 'failure')`
+- 성공: `status='success'`, `last_success_ts`, `last_processed_end`, `last_run_id`, `updated_at` 갱신
+- 실패: `status='failure'`, `last_success_ts`, `last_processed_end` 유지, `last_run_id`, `updated_at`만 갱신
 
 ---
 

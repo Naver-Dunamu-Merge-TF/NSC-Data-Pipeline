@@ -34,6 +34,7 @@ def test_pipeline_state_contract_exists() -> None:
     contract = get_contract("gold.pipeline_state")
     cast_map = contract.cast_map
     assert cast_map["pipeline_name"] == "string"
+    assert cast_map["status"] == "string"
     assert cast_map["last_processed_end"] == "timestamp"
 
 

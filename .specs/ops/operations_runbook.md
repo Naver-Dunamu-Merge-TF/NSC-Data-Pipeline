@@ -147,7 +147,14 @@ databricks jobs get-run-output <RUN_ID> -o json
 
 ```sql
 -- 파이프라인 상태
-SELECT *
+SELECT
+  pipeline_name,
+  status,
+  last_success_ts,
+  last_processed_end,
+  last_run_id,
+  updated_at,
+  dq_zero_window_counts
 FROM ${catalog}.gold.pipeline_state
 ORDER BY updated_at DESC;
 
@@ -204,7 +211,7 @@ databricks bundle run pipeline_a_guardrail -t dev \
 점검:
 1. Bronze 입력 6종(`user_wallets_raw`, `transaction_ledger_raw`, `payment_orders_raw`, `orders_raw`, `order_items_raw`, `products_raw`) 대상 윈도우 데이터 존재 확인
 2. `silver.bad_records` row 증가 추이와 `wallet_snapshot`/`ledger_entries` bad rate 임계치 초과 여부 확인
-3. `gold.pipeline_state`의 `pipeline_silver` 상태(`last_success_ts`, `last_processed_end`, `last_run_id`) 확인
+3. `gold.pipeline_state`의 `pipeline_silver` 상태(`status`, `last_success_ts`, `last_processed_end`, `last_run_id`) 확인
 
 재실행 예시:
 ```bash
@@ -219,7 +226,7 @@ databricks bundle run pipeline_silver_materialization -t dev \
 ### 6.3 Pipeline B 실패
 
 점검:
-1. `gold.pipeline_state`에서 `pipeline_silver.last_processed_end`가 대상 윈도우 이상인지 확인
+1. `gold.pipeline_state`에서 `pipeline_silver.status`, `pipeline_silver.last_processed_end`가 대상 윈도우 기준으로 정합인지 확인
 2. `silver.wallet_snapshot`, `silver.ledger_entries` 대상 `date_kst` 데이터 존재 확인
 3. `gold.dim_rule_scd2`에서 `drift_abs`, `supply_diff_abs` 임계치/rule_id 확인
 4. 임계치 비교는 `value > threshold` 규칙(경계값 동일 시 경보 아님)으로 해석
@@ -239,7 +246,7 @@ databricks bundle run pipeline_b_controls -t dev \
 ### 6.4 Pipeline C 실패
 
 점검:
-1. `gold.pipeline_state`에서 `pipeline_silver.last_processed_end`가 대상 윈도우 이상인지 확인
+1. `gold.pipeline_state`에서 `pipeline_silver.status`, `pipeline_silver.last_processed_end`가 대상 윈도우 기준으로 정합인지 확인
 2. Secret Scope/Key (`configs/{env}.yaml`의 `analytics.secret_scope`/`analytics.secret_key`) 접근 여부 확인
 3. Databricks 런타임에서는 salt 해석 실패 시 fail-closed(로컬 더미 fallback 불가)
 4. `silver.order_events/order_items/products` 조인 키 및 대상 `event_date_kst` 데이터 확인

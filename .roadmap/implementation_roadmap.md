@@ -151,6 +151,7 @@ G2-0 precedence rule:
 | GOV-004 | NotStarted | P2 | - | `.roadmap/implementation_roadmap.md` | 주간 로드맵 상태 리뷰(상태/블로커/증적) 운영 루틴 고정 | L1 | `.agents/logs/verification/20260212_gov_roadmap_weekly_review.md` | DataEng Lead | G2 | 1) 주간 리뷰 일정 고정<br>2) 상태/블로커 보고 템플릿 확정<br>3) 주간 기록 아카이브 경로 지정 |
 | GOV-006 | Done | P1 | - | `.specs/project_specs.md`, `.specs/cloud/cloud_migration_rebuild_plan.md` | 핵심 참조 문서의 로드맵 링크를 Workstream 기준으로 정렬 | L1 | `.agents/logs/verification/20260223_gov_reference_alignment.md` | DataEng | G1 | 1) 참조 링크 최신화<br>2) 링크 무결성 검증<br>3) 정렬 증적 업데이트 |
 | GOV-007 | InProgress | P2 | MON-009 | `.specs/ops/azure_monitoring_integration_plan.md`, `.specs/project_specs.md#12` | 모니터링 v2 확장 항목을 backlog gate로 분리 유지 | L1 | `.agents/logs/verification/20260212_gov_monitoring_v2_backlog.md` | Ops + DataEng | G2 | 1) v2 확장 항목 태깅 유지<br>2) G2 완료 기준에서 분리 확인<br>3) 관련 문서 일관성 점검 |
+| GOV-008 | InProgress | P0 | - | `docs/plans/2026-02-24-pipeline-state-status-contract-alignment.md` | `gold.pipeline_state.status` 계약/코드/스펙 정렬 + L0/L1/L2 증적 확보, L3/Databricks probe 재검증 대기 | L3 | `.agents/logs/verification/20260224_pipeline_state_status_spec_reflection.md` | DataEng | G3 | 1) status 전이 규칙(`success|failure`)을 계약/코드/runbook에 반영<br>2) migration/deploy/L3 실행 증적을 수집(인증 이슈 시 blocked 로그 포함)<br>3) Databricks 인증 복구 후 L3/probe PASS 증적으로 상태를 Done 전환 |
 
 ## 4) 검증 시나리오 (로드맵 품질 게이트)
 

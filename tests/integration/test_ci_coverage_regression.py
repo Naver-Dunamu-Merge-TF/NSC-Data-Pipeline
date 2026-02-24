@@ -188,6 +188,7 @@ def test_pipeline_state_helpers_and_failure_transition() -> None:
     parsed = parse_pipeline_state_record(
         {
             "pipeline_name": "pipeline_b",
+            "status": "success",
             "last_success_ts": "2026-02-11T15:00:00Z",
             "last_processed_end": "2026-02-11T15:00:00+00:00",
             "last_run_id": "run-1",
@@ -196,6 +197,7 @@ def test_pipeline_state_helpers_and_failure_transition() -> None:
         }
     )
     assert parsed.pipeline_name == "pipeline_b"
+    assert parsed.status == STATE_SUCCESS
     assert parsed.last_run_id == "run-1"
     assert parsed.updated_at.tzinfo is not None
 
@@ -210,6 +212,7 @@ def test_pipeline_state_helpers_and_failure_transition() -> None:
 
     current = PipelineStateRecord(
         pipeline_name="pipeline_b",
+        status=STATE_SUCCESS,
         last_success_ts=datetime(2026, 2, 11, 15, 0, tzinfo=UTC),
         last_processed_end=datetime(2026, 2, 11, 15, 0, tzinfo=UTC),
         last_run_id="run-1",
@@ -223,6 +226,7 @@ def test_pipeline_state_helpers_and_failure_transition() -> None:
         current_state=current,
         event_ts=datetime(2026, 2, 11, 15, 30, tzinfo=UTC),
     )
+    assert failed.status == STATE_FAILURE
     assert failed.last_success_ts == current.last_success_ts
     assert failed.last_processed_end == current.last_processed_end
     assert failed.last_run_id == "run-2"

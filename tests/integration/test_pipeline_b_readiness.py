@@ -6,16 +6,25 @@ import pytest
 
 from src.common.job_params import JobParams
 from src.common.time_utils import UTC
-from src.io.pipeline_state_io import PipelineStateRecord
+from src.io.pipeline_state_io import (
+    STATE_FAILURE,
+    STATE_SUCCESS,
+    PipelineStateRecord,
+)
 from src.io.upstream_readiness import (
     UpstreamReadinessError,
     validate_upstream_state_record,
 )
 
 
-def _pipeline_silver_state(*, processed_end: datetime) -> PipelineStateRecord:
+def _pipeline_silver_state(
+    *,
+    processed_end: datetime,
+    status: str = STATE_SUCCESS,
+) -> PipelineStateRecord:
     return PipelineStateRecord(
         pipeline_name="pipeline_silver",
+        status=status,
         last_success_ts=processed_end,
         last_processed_end=processed_end,
         last_run_id="run-silver-ready",
@@ -60,6 +69,29 @@ def test_pipeline_b_readiness_passes_when_upstream_is_fresh() -> None:
     )
     validate_upstream_state_record(
         fresh_state,
+        upstream_pipeline_name="pipeline_silver",
+        required_processed_end=params.processed_end_utc(),
+    )
+
+
+def test_pipeline_b_readiness_passes_with_failure_status_when_checkpoint_is_fresh() -> (
+    None
+):
+    params = JobParams.from_mapping(
+        {
+            "run_mode": "backfill",
+            "date_kst_start": "2026-02-11",
+            "date_kst_end": "2026-02-11",
+            "run_id": "run-b",
+        },
+        pipeline_name="pipeline_b",
+    )
+    fresh_failure_state = _pipeline_silver_state(
+        processed_end=datetime(2026, 2, 11, 15, 0, tzinfo=UTC),
+        status=STATE_FAILURE,
+    )
+    validate_upstream_state_record(
+        fresh_failure_state,
         upstream_pipeline_name="pipeline_silver",
         required_processed_end=params.processed_end_utc(),
     )
