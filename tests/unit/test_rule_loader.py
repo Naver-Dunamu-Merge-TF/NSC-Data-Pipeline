@@ -82,7 +82,14 @@ def test_load_runtime_rules_strict_raises_when_table_missing(tmp_path: Path) -> 
     )
     spark = _DummySpark(table_exists=False)
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            r"Failed to load runtime rules in strict mode "
+            r"\(table_fqn=cat\.gold\.dim_rule_scd2, mode=strict, "
+            r"cause=FileNotFoundError: Rule table not found: cat\.gold\.dim_rule_scd2\)"
+        ),
+    ):
         load_runtime_rules(
             spark,
             catalog="cat",
@@ -178,7 +185,14 @@ def test_load_runtime_rules_fallback_does_not_mask_invalid_table_payload(
         ],
     )
 
-    with pytest.raises(RuntimeError, match="Failed to load runtime rules from table"):
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            r"Failed to load runtime rules from table "
+            r"\(table_fqn=cat\.gold\.dim_rule_scd2, mode=fallback, "
+            r"cause=ValueError: rule_id is required for rule definitions\)"
+        ),
+    ):
         load_runtime_rules(
             spark,
             catalog="cat",

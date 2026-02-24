@@ -22,6 +22,13 @@ class RuleTableAccessError(RuntimeError):
     """Raised when runtime rule table cannot be looked up/read from Spark."""
 
 
+def _format_exception_cause(exc: Exception) -> str:
+    message = str(exc).strip()
+    if not message:
+        message = repr(exc)
+    return f"{type(exc).__name__}: {message}"
+
+
 def _validate_runtime_rule_integrity(
     rules: list[RuleDefinition], *, source: str
 ) -> None:
@@ -144,7 +151,9 @@ def load_runtime_rules(
     except Exception as exc:
         if normalized_mode == RULE_LOAD_MODE_STRICT:
             raise RuntimeError(
-                f"Failed to load runtime rules in strict mode (table_fqn={table_fqn})"
+                "Failed to load runtime rules in strict mode "
+                f"(table_fqn={table_fqn}, mode={normalized_mode}, "
+                f"cause={_format_exception_cause(exc)})"
             ) from exc
 
         # In fallback mode, only table-not-found errors use seed fallback.
@@ -152,7 +161,8 @@ def load_runtime_rules(
         if not isinstance(exc, (FileNotFoundError, RuleTableAccessError)):
             raise RuntimeError(
                 "Failed to load runtime rules from table "
-                f"(table_fqn={table_fqn}, mode={normalized_mode})"
+                f"(table_fqn={table_fqn}, mode={normalized_mode}, "
+                f"cause={_format_exception_cause(exc)})"
             ) from exc
 
         rules = load_rule_seed(seed_path)
