@@ -40,6 +40,7 @@ resources:
       name: data-pipeline-a-${bundle.target}
       max_concurrent_runs: 1
       timeout_seconds: 3600
+      performance_target: STANDARD
       run_as:
         service_principal_name: ${var.run_as_principal}
       schedule:
@@ -67,21 +68,16 @@ resources:
           default: ${var.rule_table}
         - name: rule_seed_path
           default: ${var.rule_seed_path}
-      job_clusters:
-        - job_cluster_key: policy_single_node
-          new_cluster:
-            spark_version: "15.4.x-scala2.12"
-            autoscale:
-              min_workers: 1
-              max_workers: 2
-            node_type_id: Standard_DS4_v2
-            policy_id: ${var.cluster_policy_id}
+      environments:
+        - environment_key: pipeline_a_serverless
+          spec:
+            environment_version: "2"
       tasks:
         - task_key: run_pipeline_a
           retry_on_timeout: true
           max_retries: 2
           min_retry_interval_millis: 300000
-          job_cluster_key: policy_single_node
+          environment_key: pipeline_a_serverless
           spark_python_task:
             python_file: scripts/run_pipeline_a.py
             parameters:
@@ -110,6 +106,7 @@ resources:
       name: data-pipeline-b-${bundle.target}
       max_concurrent_runs: 1
       timeout_seconds: 3600
+      performance_target: STANDARD
       run_as:
         service_principal_name: ${var.run_as_principal}
       schedule:
@@ -137,21 +134,16 @@ resources:
           default: ${var.rule_table}
         - name: rule_seed_path
           default: ${var.rule_seed_path}
-      job_clusters:
-        - job_cluster_key: policy_single_node
-          new_cluster:
-            spark_version: "15.4.x-scala2.12"
-            autoscale:
-              min_workers: 1
-              max_workers: 2
-            node_type_id: Standard_DS4_v2
-            policy_id: ${var.cluster_policy_id}
+      environments:
+        - environment_key: pipeline_b_serverless
+          spec:
+            environment_version: "2"
       tasks:
         - task_key: pipeline_b_recon
           retry_on_timeout: true
           max_retries: 2
           min_retry_interval_millis: 300000
-          job_cluster_key: policy_single_node
+          environment_key: pipeline_b_serverless
           spark_python_task:
             python_file: scripts/run_pipeline_b.py
             parameters:
@@ -181,7 +173,7 @@ resources:
           retry_on_timeout: true
           max_retries: 2
           min_retry_interval_millis: 300000
-          job_cluster_key: policy_single_node
+          environment_key: pipeline_b_serverless
           spark_python_task:
             python_file: scripts/run_pipeline_b.py
             parameters:
@@ -214,7 +206,7 @@ resources:
           depends_on:
             - task_key: pipeline_b_recon
             - task_key: pipeline_b_supply_ops
-          job_cluster_key: policy_single_node
+          environment_key: pipeline_b_serverless
           spark_python_task:
             python_file: scripts/run_pipeline_b.py
             parameters:
@@ -248,7 +240,7 @@ resources:
             - task_key: pipeline_b_recon
             - task_key: pipeline_b_supply_ops
           run_if: AT_LEAST_ONE_FAILED
-          job_cluster_key: policy_single_node
+          environment_key: pipeline_b_serverless
           spark_python_task:
             python_file: scripts/run_pipeline_b.py
             parameters:
@@ -279,6 +271,7 @@ resources:
       name: data-pipeline-c-${bundle.target}
       max_concurrent_runs: 1
       timeout_seconds: 3600
+      performance_target: STANDARD
       run_as:
         service_principal_name: ${var.run_as_principal}
       schedule:
@@ -300,21 +293,16 @@ resources:
           default: ""
         - name: run_id
           default: ""
-      job_clusters:
-        - job_cluster_key: policy_single_node
-          new_cluster:
-            spark_version: "15.4.x-scala2.12"
-            autoscale:
-              min_workers: 1
-              max_workers: 2
-            node_type_id: Standard_DS4_v2
-            policy_id: ${var.cluster_policy_id}
+      environments:
+        - environment_key: pipeline_c_serverless
+          spec:
+            environment_version: "2"
       tasks:
         - task_key: run_pipeline_c
           retry_on_timeout: true
           max_retries: 2
           min_retry_interval_millis: 300000
-          job_cluster_key: policy_single_node
+          environment_key: pipeline_c_serverless
           spark_python_task:
             python_file: scripts/run_pipeline_c.py
             parameters:
@@ -337,6 +325,7 @@ resources:
       name: data-pipeline-silver-${bundle.target}
       max_concurrent_runs: 1
       timeout_seconds: 3600
+      performance_target: STANDARD
       run_as:
         service_principal_name: ${var.run_as_principal}
       schedule:
@@ -364,21 +353,16 @@ resources:
           default: ${var.rule_table}
         - name: rule_seed_path
           default: ${var.rule_seed_path}
-      job_clusters:
-        - job_cluster_key: policy_single_node
-          new_cluster:
-            spark_version: "15.4.x-scala2.12"
-            autoscale:
-              min_workers: 1
-              max_workers: 2
-            node_type_id: Standard_DS4_v2
-            policy_id: ${var.cluster_policy_id}
+      environments:
+        - environment_key: pipeline_silver_serverless
+          spec:
+            environment_version: "2"
       tasks:
         - task_key: run_pipeline_silver
           retry_on_timeout: true
           max_retries: 2
           min_retry_interval_millis: 300000
-          job_cluster_key: policy_single_node
+          environment_key: pipeline_silver_serverless
           spark_python_task:
             python_file: scripts/run_pipeline_silver.py
             parameters:
@@ -407,6 +391,7 @@ resources:
       name: data-pipeline-bad-records-cleanup-${bundle.target}
       max_concurrent_runs: 1
       timeout_seconds: 3600
+      performance_target: STANDARD
       schedule:
         quartz_cron_expression: "0 50 0 1 * ?"
         timezone_id: Asia/Seoul
@@ -418,21 +403,16 @@ resources:
           default: "180"
         - name: dry_run
           default: "false"
-      job_clusters:
-        - job_cluster_key: policy_single_node
-          new_cluster:
-            spark_version: "15.4.x-scala2.12"
-            autoscale:
-              min_workers: 1
-              max_workers: 2
-            node_type_id: Standard_DS4_v2
-            policy_id: ${var.cluster_policy_id}
+      environments:
+        - environment_key: bad_records_cleanup_serverless
+          spec:
+            environment_version: "2"
       tasks:
         - task_key: cleanup_bad_records
           retry_on_timeout: true
           max_retries: 2
           min_retry_interval_millis: 300000
-          job_cluster_key: policy_single_node
+          environment_key: bad_records_cleanup_serverless
           spark_python_task:
             python_file: scripts/ops/cleanup_bad_records.py
             parameters:
@@ -447,23 +427,19 @@ resources:
       name: data-pipeline-e2e-setup-${bundle.target}
       max_concurrent_runs: 1
       timeout_seconds: 3600
+      performance_target: STANDARD
       parameters:
         - name: scenario
           default: ""
         - name: run_id
           default: ""
-      job_clusters:
-        - job_cluster_key: policy_cluster
-          new_cluster:
-            spark_version: "15.4.x-scala2.12"
-            autoscale:
-              min_workers: 1
-              max_workers: 2
-            node_type_id: Standard_DS4_v2
-            policy_id: ${var.cluster_policy_id}
+      environments:
+        - environment_key: e2e_setup_serverless
+          spec:
+            environment_version: "2"
       tasks:
         - task_key: setup_e2e_env
-          job_cluster_key: policy_cluster
+          environment_key: e2e_setup_serverless
           spark_python_task:
             python_file: scripts/e2e/setup_e2e_env.py
             parameters:
@@ -479,21 +455,17 @@ resources:
       name: data-pipeline-e2e-cleanup-${bundle.target}
       max_concurrent_runs: 1
       timeout_seconds: 3600
+      performance_target: STANDARD
       parameters:
         - name: drop_schemas
           default: "0"
-      job_clusters:
-        - job_cluster_key: policy_single_node
-          new_cluster:
-            spark_version: "15.4.x-scala2.12"
-            autoscale:
-              min_workers: 1
-              max_workers: 2
-            node_type_id: Standard_DS4_v2
-            policy_id: ${var.cluster_policy_id}
+      environments:
+        - environment_key: e2e_cleanup_serverless
+          spec:
+            environment_version: "2"
       tasks:
         - task_key: cleanup_e2e_env
-          job_cluster_key: policy_single_node
+          environment_key: e2e_cleanup_serverless
           spark_python_task:
             python_file: scripts/e2e/cleanup_e2e_env.py
             parameters:
@@ -524,23 +496,19 @@ resources:
       name: data-pipeline-sync-rules-${bundle.target}
       max_concurrent_runs: 1
       timeout_seconds: 600
+      performance_target: STANDARD
       parameters:
         - name: seed_path
           default: "mock_data/fixtures/dim_rule_scd2.json"
         - name: table_name
           default: "gold.dim_rule_scd2"
-      job_clusters:
-        - job_cluster_key: policy_single_node
-          new_cluster:
-            spark_version: "15.4.x-scala2.12"
-            autoscale:
-              min_workers: 1
-              max_workers: 2
-            node_type_id: Standard_DS4_v2
-            policy_id: ${var.cluster_policy_id}
+      environments:
+        - environment_key: sync_rule_serverless
+          spec:
+            environment_version: "2"
       tasks:
         - task_key: sync_rule_table
-          job_cluster_key: policy_single_node
+          environment_key: sync_rule_serverless
           spark_python_task:
             python_file: scripts/sync_dim_rule_scd2.py
             parameters:
@@ -605,6 +573,7 @@ resources:
       name: data-pipeline-e2e-full-${bundle.target}
       max_concurrent_runs: 1
       timeout_seconds: 3600
+      performance_target: STANDARD
       parameters:
         - name: run_mode
           default: incremental
@@ -624,18 +593,13 @@ resources:
           default: ${var.rule_table}
         - name: rule_seed_path
           default: ${var.rule_seed_path}
-      job_clusters:
-        - job_cluster_key: policy_single_node
-          new_cluster:
-            spark_version: "15.4.x-scala2.12"
-            autoscale:
-              min_workers: 1
-              max_workers: 2
-            node_type_id: Standard_DS4_v2
-            policy_id: ${var.cluster_policy_id}
+      environments:
+        - environment_key: e2e_full_serverless
+          spec:
+            environment_version: "2"
       tasks:
         - task_key: sync_rules
-          job_cluster_key: policy_single_node
+          environment_key: e2e_full_serverless
           spark_python_task:
             python_file: scripts/sync_dim_rule_scd2.py
             parameters:
@@ -648,7 +612,7 @@ resources:
         - task_key: pipeline_a
           depends_on:
             - task_key: sync_rules
-          job_cluster_key: policy_single_node
+          environment_key: e2e_full_serverless
           spark_python_task:
             python_file: scripts/run_pipeline_a.py
             parameters:
@@ -675,7 +639,7 @@ resources:
         - task_key: pipeline_silver
           depends_on:
             - task_key: pipeline_a
-          job_cluster_key: policy_single_node
+          environment_key: e2e_full_serverless
           spark_python_task:
             python_file: scripts/run_pipeline_silver.py
             parameters:
@@ -702,7 +666,7 @@ resources:
         - task_key: pipeline_b
           depends_on:
             - task_key: pipeline_silver
-          job_cluster_key: policy_single_node
+          environment_key: e2e_full_serverless
           spark_python_task:
             python_file: scripts/run_pipeline_b.py
             parameters:
@@ -729,7 +693,7 @@ resources:
         - task_key: pipeline_c
           depends_on:
             - task_key: pipeline_silver
-          job_cluster_key: policy_single_node
+          environment_key: e2e_full_serverless
           spark_python_task:
             python_file: scripts/run_pipeline_c.py
             parameters:
