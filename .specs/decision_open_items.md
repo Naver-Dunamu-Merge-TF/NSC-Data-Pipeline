@@ -514,3 +514,47 @@
   - 계획: `docs/plans/2026-02-24-d045-smoke-convergence-recovery.md`
   - 스크립트: `scripts/phase7/verify_sec005_rule_preflight.sh`, `scripts/phase7/run_sec005_smoke_recovery.sh`, `scripts/phase7/verify_sec005_smoke_l3.sh`
   - 증적: `.agents/logs/verification/20260224_d046_smoke_recovery_kickoff.md`
+
+### D-047 SEC-004 종료 기준(backend 정렬 우선 종료)
+- 상태: **결정됨(2026-02-24)**
+- 배경:
+  - SEC-004 기본 DoD는 KV-backed scope 접근 + rotation 절차(L3)까지 포함한다.
+  - 이번 사이클 목표를 `ledger-analytics-dev` scope backend를 `AZURE_KEYVAULT`로 정렬하는 것으로 제한해야 한다는 운영 요청이 있었다.
+- 결정:
+  1) 이번 사이클 SEC-004는 `ledger-analytics-dev` backend 정렬 완료(`DATABRICKS -> AZURE_KEYVAULT`)를 종료 기준으로 사용한다.
+  2) 종료 증적은 `.agents/logs/verification/20260224_sec004_scope_backend_alignment_only.md`로 고정한다.
+  3) rotation L3 full 검증은 후속 사이클에서 재개 가능 항목으로 유지한다.
+- 근거:
+  - 증적: `.agents/logs/verification/20260224_sec004_scope_backend_alignment_only.md`
+
+### D-048 SEC-005 종료 선행조건 정리(SEC-003와 분리)
+- 상태: **결정됨(2026-02-24)**
+- 배경:
+  - SEC-005는 run_as 전환/ACL/staged smoke 수렴 여부가 핵심 판정 기준이다.
+  - SEC-003의 external location read/write 검증은 별도 게이트 성격을 가지며, SEC-005 완료 판정과 결합될 경우 상태가 불필요하게 지연된다.
+- 결정:
+  1) SEC-005 종료 선행조건은 SEC-004(backend 정렬 완료)까지만 유지한다.
+  2) SEC-003 external location 검증은 독립 항목으로 계속 진행하며, SEC-005 완료 판정에서 분리한다.
+  3) SEC-005 공식 완료 증적은 D-046 staged smoke retry3 PASS 요약으로 고정한다.
+- 근거:
+  - `.agents/logs/verification/20260224_d046_smoke_recovery_summary_d046_smoke_srvless_retry3_20260224T033753Z.json`
+  - `.agents/logs/verification/20260224_d046_smoke_stage_as_d046_smoke_srvless_retry3_20260224T033753Z.json`
+  - `.agents/logs/verification/20260224_d046_smoke_stage_bc_d046_smoke_srvless_retry3_20260224T033753Z.json`
+
+### D-049 SEC-007/SEC-008 조건부 승인(시간제약 기반 임시 게이트 통과)
+- 상태: **결정됨(2026-02-24)**
+- 배경:
+  - 2026-02-24 기준 staged smoke(D-046 retry3)는 PASS이며, SEC-005 종료 증적은 확보됐다.
+  - 다만 `SEC-003`(serverless external location L3)과 SEC-007 cadence(성공 샘플 6건) 미충족으로 G1 최종 종료 선언은 즉시 어렵다.
+  - 운영 일정 제약으로 G1 진행을 멈추지 않고 임시 승인(조건부)으로 전환할 필요가 있다.
+- 결정:
+  1) SEC-007은 `Blocked` 대신 조건부 `InProgress`로 전환하고, staged smoke 1회 PASS를 임시 수용 근거로 인정한다.
+  2) SEC-008은 `NotStarted` 대신 조건부 `InProgress`로 전환하고, G1 체크리스트를 임시 승인으로 처리한다.
+  3) 잔여 필수 종료 조건은 유지한다: `SEC-003` L3 PASS, SEC-007 cadence 성공 샘플 6건 확보.
+  4) 조건부 승인 기간 중 staged smoke 실패가 재발하거나 external location 접근 이슈가 재현되면 조건부 승인을 즉시 철회하고 `Blocked`로 되돌린다.
+- 영향:
+  - 운영 일정상 G1 선행 작업은 계속 진행할 수 있다.
+  - 리스크 수용 범위와 철회 조건이 명시되어, 미완료 항목이 완료로 오인되는 것을 방지한다.
+- 근거:
+  - `.agents/logs/verification/20260224_d046_smoke_recovery_summary_d046_smoke_srvless_retry3_20260224T033753Z.json`
+  - `.agents/logs/verification/20260224_sec007_sec008_conditional_approval.md`
