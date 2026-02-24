@@ -1,0 +1,9 @@
+DatabricksJobs
+| where TimeGenerated > ago(30m)
+| where _ResourceId =~ "__DBW_RESOURCE_ID__"
+| where ActionName == "runFailed"
+| extend p = todynamic(RequestParams)
+| where tostring(p.taskKey) startswith "pipeline_b_"
+| summarize retry_failed_count=countif(tostring(p.jobTriggerType) == "retry"), latest_failure=max(TimeGenerated) by _ResourceId, parent_run_id=tostring(p.jobRunId), task_key=tostring(p.taskKey)
+| where retry_failed_count >= 2
+| project TimeGenerated=latest_failure, _ResourceId, parent_run_id, task_key, retry_failed_count

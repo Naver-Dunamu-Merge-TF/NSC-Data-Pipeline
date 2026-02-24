@@ -129,6 +129,19 @@ scripts/phase7/verify_sec003_sec004_l3.sh
 - Severity + Owner 기반 Action Group 분리
 - dev/prod 공통 규칙 프레임 유지, 채널 강도만 차등 운영
 
+Core4 rule routing baseline (MON-004):
+
+| Alert Rule | Severity | Owner | Action Group (dev) | Action Group (prod) |
+|---|---|---|---|---|
+| `dev-dp-pipeline-a-job-failure-alert` | Sev1 (P1) | Platform | `txlookup-f3-2-ag` | `<prod-platform-ag>` |
+| `dev-dp-pipeline-a-success-delay-alert` | Sev2 (P2) | Ops | `nsc-ag-agent-dev` | `<prod-ops-ag>` |
+| `dev-dp-pipeline-b-retry-exhausted-alert` | Sev1 (P1) | Ops | `nsc-ag-agent-dev` | `<prod-ops-ag>` |
+| `dev-dp-pipeline-c-cluster-timeout-alert` | Sev1 (P1) | Platform | `txlookup-f3-2-ag` | `<prod-platform-ag>` |
+
+운영 메모:
+- dev는 email 중심의 저강도 채널로 운영한다.
+- prod는 동일 rule/severity 구조를 유지하되 paging/실시간 채널 강도를 높인다.
+
 ## 5. Incident Triage
 
 ### 5.1 Step 1: 실행 컨텍스트 확보

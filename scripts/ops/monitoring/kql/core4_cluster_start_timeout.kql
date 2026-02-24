@@ -1,0 +1,19 @@
+let cluster_failures = DatabricksClusters
+| where TimeGenerated > ago(30m)
+| where _ResourceId =~ "__DBW_RESOURCE_ID__"
+| where RequestParams has "data-pipeline-c-__ENV__"
+| extend status_code = toint(extractjson("$.statusCode", Response))
+| extend error_message = tostring(extractjson("$.errorMessage", Response))
+| where status_code >= 400 or error_message has_any ("timeout", "timed out", "cluster", "startup")
+| project TimeGenerated, _ResourceId, signal_source="DatabricksClusters", status_code, error_message;
+let pipeline_c_timeout = DatabricksJobs
+| where TimeGenerated > ago(30m)
+| where _ResourceId =~ "__DBW_RESOURCE_ID__"
+| where ActionName == "runFailed"
+| extend p = todynamic(RequestParams)
+| where tostring(p.taskKey) == "run_pipeline_c"
+| extend status_code = toint(extractjson("$.statusCode", Response))
+| extend error_message = tostring(extractjson("$.errorMessage", Response))
+| where error_message has_any ("timeout", "timed out", "cluster", "startup", "start")
+| project TimeGenerated, _ResourceId, signal_source="DatabricksJobs", status_code, error_message;
+union cluster_failures, pipeline_c_timeout

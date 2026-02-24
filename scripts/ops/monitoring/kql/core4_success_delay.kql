@@ -1,0 +1,10 @@
+DatabricksJobs
+| where TimeGenerated > ago(20m)
+| where _ResourceId =~ "__DBW_RESOURCE_ID__"
+| where ActionName == "runSucceeded"
+| extend p = todynamic(RequestParams)
+| where tostring(p.taskKey) == "run_pipeline_a"
+| summarize success_count=count(), last_success=max(TimeGenerated)
+| where success_count == 0
+| extend _ResourceId="__DBW_RESOURCE_ID__"
+| project TimeGenerated=now(), _ResourceId, success_count, last_success

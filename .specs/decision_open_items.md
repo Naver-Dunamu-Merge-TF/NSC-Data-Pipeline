@@ -583,3 +583,45 @@
 - 근거:
   - `docs/plans/2026-02-24-pipeline-state-status-contract-alignment.md`
   - D-020 `gold.pipeline_state` 실패 시 업데이트 규칙
+
+### D-051 MON-003 Core4 규칙 카디널리티 잠금(정확히 4개)
+- 상태: **결정됨(2026-02-24)**
+- 배경:
+  - 모니터링 문서에서 `Core Execution Alerts 4종`은 타입 중심으로 표현되어 있어, 구현 시 `규칙 4개`와 `타입 4종 x 파이프라인 확장` 해석이 혼재될 수 있다.
+  - G2-2 (`MON-003~005`) 완료 판정에서 규칙 개수 해석 차이가 발생하면 동일 증적으로도 완료/반려가 갈릴 수 있다.
+- 결정:
+  1) v1 `MON-003~005` 범위의 Core4는 **정확히 4개 규칙**으로 고정한다.
+  2) 규칙명은 아래 예약 이름을 기준으로 운영한다.
+     - `dev-dp-pipeline-a-job-failure-alert`
+     - `dev-dp-pipeline-a-success-delay-alert`
+     - `dev-dp-pipeline-b-retry-exhausted-alert`
+     - `dev-dp-pipeline-c-cluster-timeout-alert`
+  3) 추가 파이프라인 확장(예: 타입 4종 x 파이프라인 다중 규칙)은 v2 또는 후속 change로 분리한다.
+- 영향:
+  - `MON-003`의 생성/활성 검증 기준이 고정돼 완료 판정이 일관된다.
+  - `MON-004`, `MON-005`의 라우팅/테스트 대상 규칙 집합이 명확해진다.
+- 근거:
+  - 사용자 결정(옵션 1, 2026-02-24)
+  - `.specs/ops/azure_monitoring_integration_plan.md` (M2)
+  - `.specs/ops/monitoring_resource_naming_baseline.md` Planned Name Reservation
+
+### D-052 MON-003~005 CLI 의존성 정책(`scheduled-query` preview 허용 + 버전 고정)
+- 상태: **결정됨(2026-02-24)**
+- 배경:
+  - `az monitor scheduled-query` 명령은 기본 CLI에 내장되지 않고 extension 의존성이 있다.
+  - 현재 환경 기준 stable 설치가 불가하며 preview 설치(`--allow-preview true`)가 필요하다.
+- 결정:
+  1) `MON-003~005` 실행에서 `scheduled-query` preview extension 사용을 허용한다.
+  2) required extension version은 `1.0.0b2`로 고정한다.
+  3) 모든 실행 전에 아래 preflight를 강제한다.
+     - `az extension add --name scheduled-query --allow-preview true`
+     - `az extension show --name scheduled-query --query version -o tsv`
+     - version mismatch 시 즉시 `Blocked` 처리하고 구현을 중단한다.
+  4) preflight 결과는 `.agents/logs/verification/20260224_mon003_cli_prereq.log`에 기록한다.
+- 영향:
+  - 운영/개발 실행 환경 간 CLI 동작 차이를 줄이고 재현성을 확보한다.
+  - preview 변경 리스크는 버전 pin + preflight gate로 통제한다.
+- 근거:
+  - 사용자 결정(옵션 1, 2026-02-24)
+  - 로컬 CLI 확인 결과(`scheduled-query` extension version=`1.0.0b2`)
+  - `docs/plans/2026-02-24-g2-2-core4-alert-go-live.md`

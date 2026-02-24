@@ -1,0 +1,9 @@
+DatabricksJobs
+| where TimeGenerated > ago(10m)
+| where _ResourceId =~ "__DBW_RESOURCE_ID__"
+| where ActionName == "runFailed"
+| extend p = todynamic(RequestParams)
+| where tostring(p.taskKey) == "run_pipeline_a"
+| extend error_message = tostring(extractjson("$.errorMessage", Response))
+| extend status_code = toint(extractjson("$.statusCode", Response))
+| project TimeGenerated, _ResourceId, task_key=tostring(p.taskKey), trigger=tostring(p.jobTriggerType), run_id=tostring(p.runId), parent_run_id=tostring(p.jobRunId), status_code, error_message
