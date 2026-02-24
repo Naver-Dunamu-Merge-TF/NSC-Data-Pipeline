@@ -1,6 +1,6 @@
 # Azure Monitoring Integration Plan (Databricks Pipelines)
 
-Last updated: 2026-02-11
+Last updated: 2026-02-24
 
 SSOT:
 - 본 문서는 모니터링 범위와 알림 정책의 최상위 SSOT다.
@@ -76,6 +76,10 @@ SSOT:
 1. Databricks 진단 로그 -> Log Analytics 연결
 2. A/B/C 리소스 매핑 확정
 3. dev/prod 공통 명명 규칙 고정
+4. M1 산출물 SSOT 고정
+   - 증적: `.agents/logs/verification/20260224_mon001_signal_wiring.md`
+   - 증적: `.agents/logs/verification/20260224_mon002_resource_mapping.md`
+   - 기준선 문서: `.specs/ops/monitoring_resource_naming_baseline.md`
 
 ### Phase M2: Alert Setup
 

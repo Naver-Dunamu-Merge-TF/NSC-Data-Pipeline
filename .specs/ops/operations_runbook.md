@@ -390,6 +390,35 @@ ORDER BY domain, metric;
 저장 위치:
 - `.agents/logs/verification/`
 - 템플릿: `.agents/logs/verification/templates/e2e_evidence_template.md`
+- 템플릿: `.agents/logs/verification/templates/ops_job_evidence_template.md`
+
+### 9.1 GOV-002 정기 증적 누적 기준선
+
+대상 job:
+1. `bootstrap_catalog`
+2. `bad_records_retention_cleanup`
+
+파일명 규칙:
+- `YYYYMMDD_<job>_<env>_<run_id>.md`
+
+월별 인덱스:
+- `YYYYMM_ops_job_evidence_index.md`
+- 월별 인덱스에는 해당 월의 job 증적 파일 링크를 누적한다.
+
+ops job 증적 최소 필드:
+1. 실행 일시(UTC)
+2. 실행자(Operator)
+3. environment(dev/prod)
+4. 실행 파라미터
+5. `run_id`
+6. 결과 상태(성공/실패)와 핵심 로그 경로
+7. 후속 액션(재실행/에스컬레이션/없음)
+
+### 9.2 누적 운영 절차
+
+1. 정기 누적: 월 1회(첫 영업일 KST) 대상 job 최신 실행 증적을 인덱스에 반영한다.
+2. 수동 누적: 대상 job을 수동 실행했으면 실행 당일 즉시 증적 파일을 추가한다.
+3. 누락 대응: 정기 누적이 운영 SLA를 초과하면 온콜 채널로 알림하고, 복구 전까지 관련 작업 상태를 `Blocked`로 기록한다.
 
 최소 증적 필수 항목:
 1. 실행 일시(UTC)와 오퍼레이터

@@ -53,6 +53,7 @@ Last updated: 2026-02-24
 | bundle_id | status | evidence | note |
 |---|---|---|---|
 | G2-0 | Done | WS-SEC `SEC-008` is conditional `InProgress`; D-049 conditional approval memo: `.agents/logs/verification/20260224_sec007_sec008_conditional_approval.md`; G2-0 unlock memo: `.agents/logs/verification/20260224_g2_0_gate_unlock.md` | Unlock scope is limited to starting Monitoring v1 work. |
+| G2-1 | Done | `.agents/logs/verification/20260224_mon001_signal_wiring.md`; `.agents/logs/verification/20260224_mon002_resource_mapping.md`; `.agents/logs/verification/20260224_gov001_current_planned_matrix.md`; `.agents/logs/verification/20260224_gov002_ops_evidence_baseline.md`; signoff: `.agents/logs/verification/20260224_g2_1_signal_baseline_signoff.md` | Signal wiring + monitoring baseline + governance evidence baseline synchronized. |
 
 G2-0 precedence rule:
 - `G2-0 Done` allows only WS-MON start activities while `SEC-008` is conditional `InProgress` under D-049.
@@ -94,14 +95,15 @@ G2-0 precedence rule:
 
 #### 완료 항목 (Done)
 
-완료 항목 없음.
+| task_id | status | priority | depends_on | source_doc | dod | verification_level | evidence_path | owner | target_gate |
+|---|---|---|---|---|---|---|---|---|---|
+| MON-001 | Done | P0 | SEC-008 | `.specs/ops/azure_monitoring_integration_plan.md` (M1) | Databricks diagnostic logs -> Log Analytics 연결 + A/B/C 최소 리소스 매핑 스냅샷(Workspace, LAW resource ID/GUID, job name) + 로그 유입 확인 완료 | L3 | `.agents/logs/verification/20260224_mon001_signal_wiring.md` | Platform | G2 |
+| MON-002 | Done | P1 | MON-001 | `.specs/ops/azure_monitoring_integration_plan.md` (M1) | MON-001 최소 매핑을 dev/prod 확장 매핑표로 정리하고 공통 명명 규칙을 SSOT 문서에 고정 | L1 | `.agents/logs/verification/20260224_mon002_resource_mapping.md` | Platform | G2 |
 
 #### 미완료 항목 (세부 태스크)
 
 | task_id | status | priority | depends_on | source_doc | dod | verification_level | evidence_path | owner | target_gate | 세부 태스크 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| MON-001 | NotStarted | P0 | SEC-008 | `.specs/ops/azure_monitoring_integration_plan.md` (M1) | Databricks diagnostic logs -> Log Analytics 연결 및 A/B/C 리소스 매핑 완료 | L3 | `.agents/logs/verification/20260212_mon_m1_signal_wiring.log` | Platform | G2 | 1) 진단로그 수집 범주 활성화<br>2) Log Analytics 연결 구성<br>3) A/B/C 로그 유입 확인 |
-| MON-002 | InProgress | P1 | MON-001 | `.specs/ops/azure_monitoring_integration_plan.md` (M1) | dev/prod 공통 명명 규칙 확정 및 리소스 매핑 문서 반영 | L1 | `.agents/logs/verification/20260212_mon_resource_mapping.md` | Platform | G2 | 1) 명명 규칙 표준안 확정<br>2) 리소스 ID/이름 매핑표 작성<br>3) 운영 문서 반영 |
 | MON-003 | NotStarted | P0 | MON-001 | `.specs/ops/azure_monitoring_integration_plan.md` (M2) | Core Execution Alerts 4종(Job failure, success delay, retry exhausted, cluster start/timeout) 생성 완료 | L3 | `.agents/logs/verification/20260212_mon_core4_alerts.log` | Platform | G2 | 1) 알림 규칙 4종 생성<br>2) 쿼리/임계치 검증<br>3) 활성 상태 확인 |
 | MON-004 | NotStarted | P0 | MON-003 | `.specs/ops/azure_monitoring_integration_plan.md`, `.specs/ops/operations_runbook.md` | Severity + Owner Action Group 라우팅 연결 완료 | L3 | `.agents/logs/verification/20260212_mon_action_group_binding.log` | Platform + Ops | G2 | 1) Action Group 분리 구성<br>2) 규칙별 라우팅 연결<br>3) 수신자/채널 검증 |
 | MON-005 | NotStarted | P0 | MON-004 | `.specs/ops/azure_monitoring_integration_plan.md` (M2) | 테스트 알람 최소 1회 발화 및 수신 확인 | L3 | `.agents/logs/verification/20260212_mon_test_alert_fire.log` | Ops | G2 | 1) 테스트 경보 발화 시나리오 실행<br>2) 수신 여부/지연 시간 확인<br>3) 증적 및 이슈 기록 |
@@ -138,13 +140,13 @@ G2-0 precedence rule:
 | task_id | status | priority | depends_on | source_doc | dod | verification_level | evidence_path | owner | target_gate |
 |---|---|---|---|---|---|---|---|---|---|
 | GOV-005 | Done | P0 | - | `.roadmap/implementation_roadmap.md` | Legacy Phase ↔ Workstream 매핑 표를 문서에 반영 | L1 | `.roadmap/implementation_roadmap.md` | DataEng | G1 |
+| GOV-001 | Done | P0 | - | `.specs/project_specs.md#12`, `.specs/data_contract.md` | Current/Planned 동기화 점검 매트릭스 작성 및 월 1회 갱신 규칙 고정 | L1 | `.agents/logs/verification/20260224_gov001_current_planned_matrix.md` | DataEng | G2 |
+| GOV-002 | Done | P1 | - | `.specs/project_specs.md#12`, `.specs/ops/operations_runbook.md` | `bootstrap_catalog`, `bad_records_retention_cleanup` 정기 증적 누적 기준선 확정 | L1 | `.agents/logs/verification/20260224_gov002_ops_evidence_baseline.md` | Ops + DataEng | G2 |
 
 #### 미완료 항목 (세부 태스크)
 
 | task_id | status | priority | depends_on | source_doc | dod | verification_level | evidence_path | owner | target_gate | 세부 태스크 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| GOV-001 | InProgress | P0 | - | `.specs/project_specs.md#12`, `.specs/data_contract.md` | Current/Planned 동기화 점검 매트릭스 작성 및 월 1회 갱신 규칙 고정 | L1 | `.agents/logs/verification/20260212_gov_current_planned_matrix.md` | DataEng | G2 | 1) 상태 동기화 매트릭스 작성<br>2) 월간 점검 주기/담당 지정<br>3) 템플릿 저장 경로 고정 |
-| GOV-002 | InProgress | P1 | - | `.specs/project_specs.md#12`, `.specs/ops/operations_runbook.md` | `bootstrap_catalog`, `bad_records_retention_cleanup` 정기 증적 누적 기준선 확정 | L1 | `.agents/logs/verification/20260212_gov_ops_evidence_baseline.md` | Ops + DataEng | G2 | 1) 증적 파일 네이밍 규칙 확정<br>2) 정기 실행 증적 목록 정의<br>3) runbook 반영 |
 | GOV-003 | NotStarted | P1 | GOV-002 | `.specs/ops/operations_runbook.md` | 룰 변경 거버넌스(승인/버전/유효기간) 정기 점검 증적 1회 확보 | L2 | `.agents/logs/verification/20260212_gov_rule_governance_review.log` | Ops | G2 | 1) 룰 변경 이력/승인 흐름 점검<br>2) 유효기간/중복 rule 검증<br>3) 개선 이슈 기록 |
 | GOV-004 | NotStarted | P2 | - | `.roadmap/implementation_roadmap.md` | 주간 로드맵 상태 리뷰(상태/블로커/증적) 운영 루틴 고정 | L1 | `.agents/logs/verification/20260212_gov_roadmap_weekly_review.md` | DataEng Lead | G2 | 1) 주간 리뷰 일정 고정<br>2) 상태/블로커 보고 템플릿 확정<br>3) 주간 기록 아카이브 경로 지정 |
 | GOV-006 | Done | P1 | - | `.specs/project_specs.md`, `.specs/cloud/cloud_migration_rebuild_plan.md` | 핵심 참조 문서의 로드맵 링크를 Workstream 기준으로 정렬 | L1 | `.agents/logs/verification/20260223_gov_reference_alignment.md` | DataEng | G1 | 1) 참조 링크 최신화<br>2) 링크 무결성 검증<br>3) 정렬 증적 업데이트 |

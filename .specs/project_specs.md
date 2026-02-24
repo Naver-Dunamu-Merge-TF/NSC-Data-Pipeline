@@ -1,6 +1,6 @@
 # 프로젝트 스펙 (Azure Databricks) — Ledger Controls & Analytics (v1.1)
 
-Last updated: 2026-02-12
+Last updated: 2026-02-24
 
 > 요구사항 SSOT: `.ref/SRS - Software Requirements Specification.md`  
 > DB 스키마 스냅샷: `.ref/database_schema`  
@@ -463,6 +463,16 @@ Planned:
 ---
 
 ## 12) 즉시 후속 정합화 항목
+
+### 12.1 GOV-001 Current/Planned 동기화 규칙
+
+- 기준 매트릭스 증적: `.agents/logs/verification/20260224_gov001_current_planned_matrix.md`
+- 최소 컬럼: `Domain`, `Current SSOT section`, `Planned item/backlog`, `Last verified date (UTC)`, `Owner`, `Evidence path`
+- 갱신 주기: 매월 첫 영업일 KST에 1회 정기 갱신
+- 갱신 방식: 갱신 시점의 증적 파일 경로를 매트릭스 `Evidence path`에 반드시 기록
+- 에스컬레이션: 마지막 검증일 기준 35일 초과 미갱신이면 관련 task 상태를 `Blocked`로 승격하고 원인을 기록
+
+### 12.2 운영 증적 축적
 
 1. 운영 증적 축적: `bootstrap_catalog`/`bad_records_retention_cleanup` 정기 실행 로그를 기준선으로 누적
 2. 룰 변경 거버넌스(runbook 절차) 운영 증적 축적 및 정기 점검

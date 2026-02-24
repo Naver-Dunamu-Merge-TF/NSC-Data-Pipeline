@@ -14,6 +14,10 @@ variables:
     description: Fallback seed path for Pipeline A/B/Silver
   run_as_principal:
     description: Service principal used as run_as execution identity
+  secret_scope:
+    description: Secret scope for Pipeline C anonymization salt lookup
+  secret_key:
+    description: Secret key for Pipeline C anonymization salt lookup
 targets:
   dev:
     default: true
@@ -24,6 +28,8 @@ targets:
       rule_table: gold.dim_rule_scd2
       rule_seed_path: mock_data/fixtures/dim_rule_scd2.json
       run_as_principal: "eb69a479-7a7d-4e2b-9cba-05d2262d8d3c"
+      secret_scope: ledger-analytics-dev
+      secret_key: salt_user_key
 
   prod:
     variables:
@@ -33,6 +39,8 @@ targets:
       rule_table: gold.dim_rule_scd2
       rule_seed_path: mock_data/fixtures/dim_rule_scd2.json
       run_as_principal: "<sec005-prod-service-principal>"
+      secret_scope: "<prod-secret-scope>"
+      secret_key: "<prod-secret-key>"
 
 resources:
   jobs:
@@ -293,6 +301,12 @@ resources:
           default: ""
         - name: run_id
           default: ""
+        - name: salt
+          default: ""
+        - name: secret_scope
+          default: ${var.secret_scope}
+        - name: secret_key
+          default: ${var.secret_key}
       environments:
         - environment_key: pipeline_c_serverless
           spec:
@@ -320,6 +334,12 @@ resources:
               - "{{job.parameters.date_kst_end}}"
               - "--run-id"
               - "{{job.parameters.run_id}}"
+              - "--salt"
+              - "{{job.parameters.salt}}"
+              - "--secret-scope"
+              - "{{job.parameters.secret_scope}}"
+              - "--secret-key"
+              - "{{job.parameters.secret_key}}"
 
     pipeline_silver_materialization:
       name: data-pipeline-silver-${bundle.target}
