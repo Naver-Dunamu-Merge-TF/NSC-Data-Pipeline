@@ -4,6 +4,66 @@
 
 ---
 
+## 0. 프로젝트 개요 및 설계 배경
+
+### 시스템 개요
+
+Controls-first Ledger Pipelines는 결제·지갑 원장의 일일 정합성 검증, 운영 이상 감지,
+익명화 분석 출력을 자동화하는 Azure Databricks 배치 파이프라인이다.
+
+네 개의 독립 파이프라인으로 구성된다:
+
+| 파이프라인 | 역할 | 입력 → 출력 |
+|---|---|---|
+| **Silver (Materialization)** | Bronze 계약 검증·표준화·quarantine | Bronze 6개 → Silver 6개 + `bad_records` |
+| **A (Guardrail)** | Bronze DQ 지표 계산 + 태그 발행 | Bronze 3개 → `silver.dq_status`, `gold.exception_ledger` |
+| **B (Controls)** | 잔액 대사·공급량·운영 지표·관리자 검색 | Silver + Bronze 일부 → Gold 7개 |
+| **C (Analytics)** | 익명화 결제 팩트 | Silver 3개 → `gold.fact_payment_anonymized` |
+
+실행 순서 의존성: `A → Silver → (B ‖ C)`.
+B/C는 `gold.pipeline_state`의 `pipeline_silver.last_processed_end`를 하드 게이트로 체크하며,
+충족되지 않으면 `UpstreamReadinessError`로 즉시 종료한다(fail-closed).
+
+---
+
+### 왜 이 설계인가 — 해결해야 했던 세 가지 구조적 문제
+
+#### 문제 1 — 지연 감지의 비용 구조
+
+하루 수십만 건 규모에서 원장 오류를 배치 완료 이후에 발견하면,
+정산 재처리·롤백 대상 범위가 발견 지연 시간에 비례해 증가한다.
+DQ 이상이 입력 단계에서 포착되지 않으면 Gold까지 전파된 뒤에야 오류 범위가 드러난다.
+
+→ **Silver에서 fail-fast**: `bad_records_rate`가 규칙 임계값을 초과하면
+  `enforce_bad_records_rate`가 `RuntimeError`를 발생시켜 Silver 쓰기 자체를 차단한다.
+  불량 데이터를 Gold까지 흘려보내는 것보다 중단이 안전하다는 설계 원칙.
+
+#### 문제 2 — 입력 품질과 대사 결과의 분리
+
+Pipeline B의 정산(Δ잔액 = 순 흐름)은 입력 데이터가 완전할 때만 유효하다.
+Bronze 소스가 신선하지 않거나 이벤트 누락이 의심되는 상태에서 드리프트 알람이 발생하면,
+실제 오류인지 데이터 품질 문제인지 구분할 수단이 없다.
+
+→ **소프트 게이팅 메커니즘**: Pipeline A가 10분 주기로
+  `SOURCE_STALE`, `EVENT_DROP_SUSPECTED` 등의 `dq_tag`를 `silver.dq_status`에 기록한다.
+  B는 대상 날짜의 태그를 읽어 `SOURCE_STALE`/`EVENT_DROP_SUSPECTED` 태그가 있으면
+  임계값 판정을 억제(suppress)하고 결과에 태그를 첨부한다.
+  이로써 DQ 알람(A 채널)과 대사 알람(B 채널)이 분리된다.
+
+#### 문제 3 — 룰 재현성과 감사 추적 불가
+
+임계값이 코드에 하드코딩되어 있으면, 사후 감사 시점에 "해당 배치가 어떤 임계값으로
+판정되었는가"를 재현할 수 없다. 또한 임계값 조정마다 코드 배포가 필요하다.
+
+→ **런타임 룰 로딩 + SCD2**: 모든 임계값의 SSOT는 `gold.dim_rule_scd2`다.
+  A/B/Silver는 실행 시점에 이 테이블에서 규칙을 로드하며,
+  SCD2 구조로 이력이 보존되어 과거 배치의 판정 기준을 재현할 수 있다.
+  모든 출력 행에는 `run_id`와 `rule_id`가 기록되어
+  "언제, 어떤 룰로, 어떤 판정이 내려졌는가"가 행 수준에서 추적된다.
+  `gold.pipeline_state`에 실행 이력이 쌓여 임의 시점 재실행 시 멱등성을 보장한다.
+
+---
+
 ## 1. 전체 구조 한눈에 보기
 
 ### 데이터 레이어

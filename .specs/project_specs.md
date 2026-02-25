@@ -73,23 +73,86 @@ Last updated: 2026-02-24
 
 ## 1) 비즈니스 목적과 경계
 
-### 1.1 비즈니스 목적 (Controls-first)
+### 1.1 시스템 역할 및 컴포넌트 구성
 
-Databricks는 결제/지갑 OLTP를 대체하는 시스템이 아니라, NSC 결제 운영의
-사후 통제(controls)와 분석 적재를 담당한다.
+본 시스템은 결제/지갑 OLTP의 일일 정합성 검증, 운영 이상 감지,
+익명화 분석 출력을 자동화하는 Azure Databricks 배치 파이프라인이다.
+OLTP 트랜잭션 처리(Freeze/Settle/Rollback), ACID 원장 쓰기, 초단위 단건 Serving은 범위 밖이다.
 
-- 재무/운영 통제: 일일 대사와 공급-잔액 정합성으로 "원장 해석 가능성"을 확보한다.
-- 예외 관리: 이상 신호를 `gold.exception_ledger`에 단일 원장으로 남겨 운영 대응 근거를 만든다.
-- 분석 기반: PII 없이 결제 패턴을 적재해 운영/상품 의사결정을 지원한다.
+**처리 계층**
 
-### 1.2 왜 필요한가 (Business Need)
+| 계층 | 역할 | 보증 |
+|---|---|---|
+| Bronze | 원본 보존 (append-only, 6개 테이블) | 원본 불변 |
+| Silver | 계약(contract) 검증·표준화·quarantine (7개 테이블) | 불량률 임계값 초과 시 fail-fast |
+| Gold | 통제 결과·분석·룰·상태 (10개 테이블) | MERGE/partition overwrite로 재실행 수렴 |
 
-- 결제 서비스 규모가 커질수록 수동 점검만으로는 drift/supply mismatch를 제때 탐지하기 어렵다.
-- 원장 이상 징후가 늦게 발견되면 고객 정산 신뢰, 재무 리스크, 운영 복구 비용이 동시에 증가한다.
-- `run_id`/`rule_id` 기반 증적이 없으면 "언제/왜/어떤 기준으로" 판단했는지 감사 추적이 어렵다.
+**파이프라인 4개의 책임 분리**
 
-즉, 본 스펙의 목적은 "데이터를 쌓는 것"이 아니라,
-"원장 통제를 운영 가능한 프로세스로 고정"하는 데 있다.
+| 파이프라인 | 핵심 책임 | 주 출력 |
+|---|---|---|
+| Silver | Bronze → Silver contract validation + quarantine | `silver.*`, `silver.bad_records` |
+| A (Guardrail) | Bronze DQ 4지표 계산 + `dq_tag` 발행 | `silver.dq_status`, `gold.exception_ledger` |
+| B (Controls) | `Δ잔액 = 순흐름` 대사 + 공급량·운영지표·관리자 검색 | Gold 7개 |
+| C (Analytics) | 익명화 결제 팩트 (`user_key = sha256(user_id + salt)`) | `gold.fact_payment_anonymized` |
+
+**실행 순서 의존성**
+
+```
+A → Silver → (B ‖ C)
+```
+
+B/C는 시작 시 `assert_pipeline_ready("pipeline_silver")`를 호출해
+`gold.pipeline_state`의 `pipeline_silver.last_processed_end >= required_processed_end`를 검증한다.
+조건 미충족 시 `UpstreamReadinessError`를 발생시키고 산출물 없이 즉시 종료한다(fail-closed).
+
+### 1.2 설계 결정의 근거 — 세 가지 구조적 문제
+
+#### P1 — DQ 오류의 하류 전파 비용
+
+Bronze에 유입된 불량 레코드가 Silver·Gold까지 전파되면,
+정산·공급량 결과가 오염된 상태에서 알람이 발생한다.
+발견 지점이 Gold 이후일수록 정산 재처리·롤백 범위가 시간에 비례해 확대된다.
+
+**구현 결정**:
+- `src/transforms/silver_controls.py`의 `enforce_bad_records_rate`가
+  `bad_records_rate`를 `gold.dim_rule_scd2`에서 로드한 임계값과 비교하여
+  초과 시 `RuntimeError`를 발생시킨다 — Silver 쓰기 자체를 차단.
+- 불량 레코드는 `silver.bad_records`에 격리(`detected_date_kst` 파티션, append-only, 180일 보존)하여
+  원본 Silver 테이블에 혼입되지 않는다.
+
+#### P2 — DQ 알람과 대사 알람의 미분리
+
+Bronze 소스가 `SOURCE_STALE`(신선도 임계값 초과) 또는 `EVENT_DROP_SUSPECTED`(연속 zero-window)
+상태일 때 대사(`Δ잔액 = 순흐름`) 알람이 발생하면, 실제 원장 오류와 데이터 공백을 구분할 수 없다.
+두 신호가 동일 채널에 섞이면 false alarm 억제와 실제 예외 감지가 동시에 불가능하다.
+
+**구현 결정**:
+- Pipeline A가 10분 주기로 4가지 DQ 지표(`freshness_sec`, `dup_rate`, `bad_records_rate`, `zero_windows`)를 계산하고
+  우선순위 규칙(`SOURCE_STALE > DUP_SUSPECTED > EVENT_DROP_SUSPECTED > CONTRACT_VIOLATION`)에 따라
+  단일 `dq_tag`를 `silver.dq_status`에 기록한다.
+- Pipeline B는 대상 `date_kst`의 `dq_tag`를 `silver.dq_status`에서 읽어,
+  `SOURCE_STALE`/`EVENT_DROP_SUSPECTED` 태그가 있으면 대사·공급량 임계값 판정을 억제(suppress)하고
+  결과 행에 해당 태그를 첨부한다.
+- `zero_windows` 연속 카운트는 `gold.pipeline_state.dq_zero_window_counts`(JSON)에 유지되어
+  파이프라인 재시작 후에도 연속성이 보존된다.
+
+#### P3 — 임계값 재현 불가와 감사 추적 단절
+
+임계값이 코드에 하드코딩되어 있으면:
+- 임계값 조정마다 코드 배포가 필요하다.
+- 과거 배치 실행 당시 어떤 임계값으로 판정했는지 재현할 수 없다.
+- 어떤 룰이 어떤 행에 적용됐는지 추적하는 방법이 없다.
+
+**구현 결정**:
+- `gold.dim_rule_scd2`가 모든 임계값의 SSOT다.
+  A/B/Silver 런타임은 실행 시점에 이 테이블에서 규칙을 로드하며(`rule_load_mode: strict|fallback`),
+  코드 변경 없이 `sync_dim_rule_scd2` job으로 임계값을 갱신할 수 있다.
+- SCD2 구조로 이력이 보존되어 임의 과거 배치의 판정 기준을 재현할 수 있다.
+- prod 문맥(`PIPELINE_ENV=prod` 또는 prod catalog)에서 `rule_load_mode != strict`이면
+  `rule_mode_guard`가 즉시 차단한다.
+- Silver·Gold의 모든 출력 행에 `run_id`(실행 추적)와 `rule_id`(룰 적용 추적)가 기록된다.
+  `gold.pipeline_state`에 실행 이력이 쌓여 임의 시점 재실행 시 멱등성이 보장된다.
 
 ### 1.3 성공 기준 (Business + Operational DoD)
 
