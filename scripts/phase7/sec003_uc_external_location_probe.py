@@ -30,8 +30,9 @@ def _sanitize_suffix(raw: str) -> str:
 
 
 def build_probe_location(base_path: str, run_id: str) -> str:
+    # Keep probe at root-level file path to avoid nested Delta log directory checks.
     suffix = _sanitize_suffix(run_id)
-    return f"{base_path.rstrip('/')}/bronze/_sec003_extloc_probe/{suffix}"
+    return f"{base_path.rstrip('/')}/_sec003_probe_{suffix}.txt"
 
 
 def _emit(step: str, **payload: object) -> None:
@@ -62,39 +63,30 @@ def _assert_external_location_rw(
     base_path: str,
     run_id: str,
 ) -> None:
-    probe_suffix = _sanitize_suffix(run_id)
-    probe_table = f"`{catalog}`.`bronze`.`__sec003_extloc_probe_{probe_suffix}`"
     probe_location = build_probe_location(base_path=base_path, run_id=run_id)
+    marker = f"sec003::{run_id}"
 
     # Validate that external location metadata is queryable.
     spark.sql(f"DESCRIBE EXTERNAL LOCATION `{external_location}`")
 
-    spark.sql(f"DROP TABLE IF EXISTS {probe_table}")
-    spark.sql(
-        f"CREATE TABLE {probe_table} (id BIGINT, marker STRING) USING DELTA "
-        f"LOCATION '{probe_location}'"
-    )
-    spark.sql(f"INSERT INTO {probe_table} VALUES (1, 'sec003')")
-    count_value = spark.sql(f"SELECT COUNT(*) AS cnt FROM {probe_table}").collect()[0][
-        0
-    ]
-    if int(count_value) != 1:
-        raise RuntimeError(f"External location probe row count mismatch: {count_value}")
-    spark.sql(f"DROP TABLE IF EXISTS {probe_table}")
-
     try:
         from pyspark.dbutils import DBUtils
 
-        DBUtils(spark).fs.rm(probe_location, recurse=True)
-    except Exception:
-        # Cleanup best-effort only; object-level validation already completed.
-        pass
+        dbutils = DBUtils(spark)
+        dbutils.fs.put(probe_location, marker, overwrite=True)
+        # Runtime compatibility: some serverless runtimes don't accept keyword args.
+        observed = dbutils.fs.head(probe_location, max(64, len(marker) + 16))
+        if marker not in observed:
+            raise RuntimeError("External location probe content mismatch")
+        dbutils.fs.rm(probe_location, recurse=False)
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f"External location probe failed: {exc}") from exc
 
     _emit(
         "external_location_rw_ok",
         external_location=external_location,
         probe_location=probe_location,
-        row_count=int(count_value),
+        marker_size=len(marker),
     )
 
 

@@ -44,7 +44,9 @@ require_cmd() {
 
 build_payload() {
   local run_id="$1"
+  local job_id="$2"
   jq -nc \
+    --arg job_id "${job_id}" \
     --arg run_id "${run_id}" \
     --arg catalog "${CATALOG_NAME}" \
     --arg external_location "${EXTERNAL_LOCATION_NAME}" \
@@ -52,6 +54,7 @@ build_payload() {
     --arg secret_scope "${SECRET_SCOPE}" \
     --arg secret_key "${SECRET_KEY}" \
     '{
+      job_id: ($job_id | tonumber),
       job_parameters: {
         run_id: $run_id,
         catalog: $catalog,
@@ -127,10 +130,10 @@ extract_sec004_hash() {
 run_window_once() {
   local logical_run_id="$1"
   local payload
-  payload="$(build_payload "${logical_run_id}")"
+  payload="$(build_payload "${logical_run_id}" "${JOB_ID}")"
 
   local response
-  response="$(databricks jobs run-now "${JOB_ID}" --no-wait --json "${payload}" --output json)"
+  response="$(databricks jobs run-now --no-wait --json "${payload}" --output json)"
   local run_id
   run_id="$(echo "${response}" | jq -r '.run_id // empty')"
 
@@ -140,10 +143,20 @@ run_window_once() {
   fi
 
   log "triggered ${JOB_NAME}: workspace_run_id=${run_id}, logical_run_id=${logical_run_id}"
-  wait_for_run "${run_id}"
+  if ! wait_for_run "${run_id}"; then
+    log "workspace run failed: run_id=${run_id}"
+    return 1
+  fi
 
   local hash
-  hash="$(extract_sec004_hash "${run_id}")"
+  if ! hash="$(extract_sec004_hash "${run_id}")"; then
+    log "failed to extract sec004 hash: run_id=${run_id}"
+    return 1
+  fi
+  if [[ -z "${hash}" ]]; then
+    log "empty sec004 hash: run_id=${run_id}"
+    return 1
+  fi
   log "sec004 hash captured for run_id=${run_id}"
 
   printf '%s %s\n' "${run_id}" "${hash}"
@@ -209,10 +222,18 @@ fi
 
 log "starting L3 verification: job_name=${JOB_NAME}, job_id=${JOB_ID}"
 
-PRE_RESULT="$(run_with_retry "pre_window" "${RUN_ID_PREFIX}_pre")"
+if ! PRE_RESULT="$(run_with_retry "pre_window" "${RUN_ID_PREFIX}_pre")"; then
+  echo "pre window verification failed" >&2
+  exit 1
+fi
 PRE_RUN_ID="$(echo "${PRE_RESULT}" | awk '{print $1}')"
 PRE_HASH="$(echo "${PRE_RESULT}" | awk '{print $2}')"
 PRE_ATTEMPTS_USED="$(echo "${PRE_RESULT}" | awk '{print $3}')"
+
+if [[ -z "${PRE_RUN_ID}" || -z "${PRE_HASH}" || -z "${PRE_ATTEMPTS_USED}" ]]; then
+  echo "invalid pre-window result payload: ${PRE_RESULT}" >&2
+  exit 1
+fi
 
 POST_RUN_ID=""
 POST_HASH=""
@@ -233,11 +254,19 @@ if [[ "${ROTATE_SECRET}" == "1" ]]; then
     rotate_secret_version "${NEW_SECRET_VALUE}"
     sleep 5
 
-    POST_RESULT="$(run_with_retry "post_window_rotation_${rotation_attempt}" "${RUN_ID_PREFIX}_post_r${rotation_attempt}")"
+    if ! POST_RESULT="$(run_with_retry "post_window_rotation_${rotation_attempt}" "${RUN_ID_PREFIX}_post_r${rotation_attempt}")"; then
+      log "post-window run failed before hash compare: rotation_attempt=${rotation_attempt}"
+      continue
+    fi
     POST_RUN_ID="$(echo "${POST_RESULT}" | awk '{print $1}')"
     POST_HASH="$(echo "${POST_RESULT}" | awk '{print $2}')"
     POST_ATTEMPTS_USED="$(echo "${POST_RESULT}" | awk '{print $3}')"
     ROTATION_ATTEMPTS_USED="${rotation_attempt}"
+
+    if [[ -z "${POST_RUN_ID}" || -z "${POST_HASH}" || -z "${POST_ATTEMPTS_USED}" ]]; then
+      log "invalid post-window result payload: ${POST_RESULT}"
+      continue
+    fi
 
     if [[ "${PRE_HASH}" != "${POST_HASH}" ]]; then
       rotation_gate_ok=1

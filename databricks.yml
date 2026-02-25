@@ -46,7 +46,7 @@ resources:
   jobs:
     pipeline_a_guardrail:
       name: data-pipeline-a-${bundle.target}
-      max_concurrent_runs: 1
+      max_concurrent_runs: 2
       timeout_seconds: 3600
       performance_target: STANDARD
       run_as:

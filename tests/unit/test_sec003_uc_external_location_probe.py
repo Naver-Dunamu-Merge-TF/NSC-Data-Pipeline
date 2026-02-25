@@ -14,8 +14,7 @@ def test_build_probe_location_normalizes_trailing_slash() -> None:
         run_id="run-1",
     )
     assert (
-        path
-        == "abfss://container@account.dfs.core.windows.net/bronze/_sec003_extloc_probe/run_1"
+        path == "abfss://container@account.dfs.core.windows.net/_sec003_probe_run_1.txt"
     )
 
 
