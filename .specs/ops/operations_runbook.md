@@ -1,6 +1,6 @@
 # Operations Runbook (Pipeline A/Silver/B/C)
 
-Last updated: 2026-02-24
+Last updated: 2026-02-25
 
 ## 1. Scope
 
@@ -67,6 +67,11 @@ Pipeline B task 구성:
 
 목적:
 - UC 권한/External Location 접근(SEC-003)과 KV-backed Secret Scope 검증(SEC-004)을 동일 변경 창에서 처리한다.
+
+게이트 해석:
+- `SEC-003`/`SEC-004`는 `G1-Sec`(보안완결) 게이트에 속한다.
+- `G1-Run`(운영가동) 판정은 staged smoke 수렴을 기준으로 하며, `SEC-003` 미충족 시에도 조건부 진행이 가능하다.
+- 최종 `G1` 서명은 `G1-Run`과 `G1-Sec`를 모두 충족해야 한다.
 
 실행 순서:
 1. 권한/시크릿 바인딩 적용:

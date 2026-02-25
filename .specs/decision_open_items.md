@@ -625,3 +625,21 @@
   - 사용자 결정(옵션 1, 2026-02-24)
   - 로컬 CLI 확인 결과(`scheduled-query` extension version=`1.0.0b2`)
   - `docs/plans/2026-02-24-g2-2-core4-alert-go-live.md`
+
+### D-053 G1 판정 이중화(`G1-Run`/`G1-Sec`) 명시
+- 상태: **결정됨(2026-02-25)**
+- 배경:
+  - 서버리스 환경에서 UC managed table 경로는 정상이나 external location(`SEC-003`)은 NCC/네트워크 경로에 따라 별도 실패할 수 있다.
+  - 동일 `G1` 게이트에서 운영가동 가능 여부와 보안완결 여부를 함께 판정하면 상태 해석이 혼재된다.
+- 결정:
+  1) `G1`은 최종 서명 게이트로 유지하되, 하위 판정을 `G1-Run`/`G1-Sec`으로 분리해 문서에 명시한다.
+  2) `G1-Run` 완료 기준은 staged smoke 수렴 + A/Silver/B/C 서버리스 실행 가능으로 고정한다.
+  3) `G1-Sec` 완료 기준은 `SEC-003` external location L3 PASS + `SEC-007` cadence 성공 샘플 6건 확보로 고정한다.
+  4) `SEC-003` 미충족은 `G1-Sec`/최종 G1 서명을 차단하되, `G1-Run` 범위의 조건부 진행은 허용한다.
+- 영향:
+  - 운영 실행 가능 상태와 보안완결 상태를 분리해 의사결정/에스컬레이션 기준이 명확해진다.
+  - 조건부 승인(`SEC-007`, `SEC-008`)의 수용 범위와 철회 조건을 일관되게 해석할 수 있다.
+- 근거:
+  - `.roadmap/implementation_roadmap.md`
+  - `.specs/ops/cutover_preflight_exit_template.md`
+  - `.specs/ops/operations_runbook.md`

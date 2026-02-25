@@ -1,6 +1,6 @@
 # 실행 로드맵 (Workstream 기반, 운영완결형, 증적기반 DoD)
 
-Last updated: 2026-02-24
+Last updated: 2026-02-25
 
 ## 1) 목적과 범위
 
@@ -43,7 +43,9 @@ Last updated: 2026-02-24
 
 ### 2.3 게이트 정의
 
-- `G1`: Secure Binding Ready (사전 프로비저닝 자산 검증 + 권한/시크릿 바인딩 완료)
+- `G1`: Secure Binding Ready (최종 서명 게이트; `G1-Run` + `G1-Sec` 모두 충족 시 완료)
+- `G1-Run`: Serverless Pipeline Operational Ready (A/Silver/B/C 서버리스 실행 가능 + staged smoke 수렴)
+- `G1-Sec`: Serverless External Access Security Ready (`SEC-003` external location L3 + `SEC-007` cadence 충족)
 - `G2`: Monitoring v1 Live (Core 4 알림 + Workbook + runbook 링크 완료)
 - `G3`: Cutover Rehearsal Passed (dry-run/backfill/incremental/rollback 리허설 통과)
 - `G4`: Prod Cutover + Hypercare Complete
@@ -60,6 +62,13 @@ G2-0 precedence rule:
 - This rule does not imply `SEC-008 Done` and does not imply final G1 signoff.
 - WS-MON `depends_on=SEC-008` remains effective for closure; G2-0 only unlocks start execution.
 
+### 2.5 G1 이중 게이트 판정 규칙
+
+- `G1-Run` 통과는 운영 실행 가능 판정이다. `SEC-003` 미충족 상태에서도 조건부 진행이 가능하다.
+- `G1-Sec` 통과는 external location/serverless 네트워크 경로까지 포함한 보안완결 판정이다.
+- 최종 `G1` 서명은 `G1-Run`과 `G1-Sec`를 모두 충족해야 가능하다.
+- `SEC-003` 재현 이슈가 재발하면 조건부 승인(`SEC-007`, `SEC-008`)은 즉시 철회하고 `Blocked`로 복귀한다.
+
 ## 3) Workstream Backlog
 
 ### 3.1 WS-SEC (Security And Pre-Provisioned Resource Binding)
@@ -73,12 +82,12 @@ G2-0 precedence rule:
 | task_id | status | priority | depends_on | source_doc | dod | verification_level | evidence_path | owner | target_gate | 세부 태스크 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | SEC-001 | Done | P0 | - | `.specs/cloud/cloud_migration_rebuild_plan.md` | 인프라팀 handoff 자산 목록(workspace, storage, UC, external location, KV, SP)을 확정하고 운영 잠금 버전을 기록 | L3 | `.agents/logs/verification/20260223_sec001_subagent_review.md` | Platform + DataEng | G1 | 1) handoff 인벤토리 템플릿 확정<br>2) 자산 식별값/권한 주체 수집 및 증적 로그 적재(`20260223_infra_cli_audit.log`)<br>3) 운영 잠금 버전/변경이력 기록(완료) |
-| SEC-003 | InProgress | P0 | SEC-001 | `.specs/ops/cutover_preflight_exit_template.md`, `scripts/phase7/sec003_sec004_binding_window.sh` | UC 권한(`USE CATALOG/SCHEMA`, `SELECT`, `MODIFY`) 및 external location 접근 검증 통과(서버리스 SEC window 기준) | L3 | `.agents/logs/verification/YYYYMMDD_sec003_uc_external_location_serverless.md` | DataEng + Infra | G1 | 1) UC grant 매트릭스 확정(그룹 + 검증자 임시 권한)<br>2) `sec003_sec004_binding_window.sh`로 ACL 적용<br>3) `verify_sec003_sec004_l3.sh`로 external location read/write 검증 |
+| SEC-003 | InProgress | P0 | SEC-001 | `.specs/ops/cutover_preflight_exit_template.md`, `scripts/phase7/sec003_sec004_binding_window.sh` | UC 권한(`USE CATALOG/SCHEMA`, `SELECT`, `MODIFY`) 및 external location 접근 검증 통과(서버리스 SEC window 기준, `G1-Sec` 전용 게이트) | L3 | `.agents/logs/verification/YYYYMMDD_sec003_uc_external_location_serverless.md` | DataEng + Infra | G1 | 1) UC grant 매트릭스 확정(그룹 + 검증자 임시 권한)<br>2) `sec003_sec004_binding_window.sh`로 ACL 적용<br>3) `verify_sec003_sec004_l3.sh`로 external location read/write 검증 |
 | SEC-004 | Done | P0 | SEC-001 | `.specs/cloud/cloud_migration_rebuild_plan.md`, `.specs/decision_open_items.md`, `scripts/phase7/sec003_sec004_binding_window.sh` | `ledger-analytics-dev` scope backend를 `AZURE_KEYVAULT`로 정렬 완료(이번 사이클은 backend 정렬 기준으로 종료) | L1 | `.agents/logs/verification/20260224_sec004_scope_backend_alignment_only.md` | Infra | G1 | 1) 기존 `ledger-analytics-dev` backend가 `DATABRICKS`임을 확인<br>2) Key Vault(`nsc-kv-dev`) 기반 scope 재생성 완료<br>3) 최종 backend=`AZURE_KEYVAULT` 재검증 |
 | SEC-005 | Done | P0 | SEC-004 | `.specs/decision_open_items.md` (D-018, D-044, D-045, D-046, D-048), `.specs/cloud/cloud_migration_rebuild_plan.md` | 서비스 프린시플 `run_as` 전환 + UC ACL 최소권한 적용 + staged smoke(L3) 수렴 성공(2026-02-24 retry3) | L3 | `.agents/logs/verification/20260224_d046_smoke_recovery_summary_d046_smoke_srvless_retry3_20260224T033753Z.json` | Infra + DataEng | G1 | 1) A/Silver/B/C 서버리스 wiring 배포 및 runtime assertion PASS<br>2) SP+verifier ACL assertions PASS (`20260223_sec005_acl_assertions.json`, `20260223_sec005_verifier_acl_assertions.json`)<br>3) D-046 staged smoke 표준(`sync_dim_rule_scd2 -> A/Silver -> B/C`) 실행에서 stage A/Silver/B/C 모두 PASS (`20260224_d046_smoke_recovery_summary_d046_smoke_srvless_retry3_20260224T033753Z.json`)<br>4) SEC-003 external location 검증은 독립 게이트로 분리 유지(SEC-005 종료 선행조건에서 제외) |
 | SEC-006 | Done | P1 | SEC-001, SEC-004 | `.specs/cloud/cloud_migration_rebuild_plan.md#12.1`, `configs/dev.yaml`, `configs/common.yaml` | `configs/dev.yaml`/`configs/common.yaml`의 host/id/catalog/external_location/base_path/secret 값이 실측값과 일치 | L1 | `.agents/logs/verification/20260223_sec006_config_alignment.md` | DataEng | G1 | 1) deterministic baseline 파일(`20260223_sec006_expected_values.env`) 고정<br>2) pre/post check 모두 mismatch 0 확인<br>3) L1 unit gate(`194 passed`) 증적 반영 완료 |
-| SEC-007 | InProgress | P1 | SEC-003, SEC-006 | `.specs/cloud/cloud_migration_rebuild_plan.md#12.1`, `docs/plans/2026-02-24-d045-smoke-convergence-recovery.md`, `.specs/decision_open_items.md` (D-049) | 조건부 승인: staged smoke 1회 PASS(2026-02-24 retry3)를 G1 임시 통과 근거로 수용, `SEC-003` L3 + cadence 성공 샘플 6건은 후속 종료 조건으로 이관 | L3 | `.agents/logs/verification/20260224_sec007_sec008_conditional_approval.md` | DataEng | G1 | 1) D-049 기준으로 SEC-007을 Blocked에서 조건부 진행 상태로 전환<br>2) 잔여 필수항목(`SEC-003` external location L3, cadence `sample_count>=6`)을 후속 트랙으로 고정<br>3) 조건부 기간에는 staged smoke 실패 재발 시 즉시 조건부 승인 철회 |
-| SEC-008 | InProgress | P0 | SEC-003, SEC-004, SEC-005, SEC-007 | `.specs/cloud/cloud_migration_rebuild_plan.md`, `.specs/ops/cutover_preflight_exit_template.md`, `.specs/decision_open_items.md` (D-049) | 조건부 승인: G1 체크리스트를 임시 승인으로 통과시키되 최종 서명은 `SEC-003` L3 및 SEC-007 cadence 종료 후 확정 | L3 | `.agents/logs/verification/20260224_sec007_sec008_conditional_approval.md` | Platform | G1 | 1) Infra/Platform/DataEng 조건부 합동 서명 기록<br>2) 잔여 오픈 항목(`SEC-003`, SEC-007 cadence)과 리스크 수용 범위 명시<br>3) 잔여 항목 완료 시 SEC-008 최종 서명 로그로 대체 |
+| SEC-007 | InProgress | P1 | SEC-003, SEC-006 | `.specs/cloud/cloud_migration_rebuild_plan.md#12.1`, `docs/plans/2026-02-24-d045-smoke-convergence-recovery.md`, `.specs/decision_open_items.md` (D-049) | 조건부 승인: staged smoke 1회 PASS(2026-02-24 retry3)를 `G1-Run` 임시 통과 근거로 수용, `SEC-003` L3 + cadence 성공 샘플 6건은 `G1-Sec` 종료 조건으로 유지 | L3 | `.agents/logs/verification/20260224_sec007_sec008_conditional_approval.md` | DataEng | G1 | 1) D-049 기준으로 SEC-007을 Blocked에서 조건부 진행 상태로 전환<br>2) 잔여 필수항목(`SEC-003` external location L3, cadence `sample_count>=6`)을 후속 트랙으로 고정<br>3) 조건부 기간에는 staged smoke 실패 재발 시 즉시 조건부 승인 철회 |
+| SEC-008 | InProgress | P0 | SEC-003, SEC-004, SEC-005, SEC-007 | `.specs/cloud/cloud_migration_rebuild_plan.md`, `.specs/ops/cutover_preflight_exit_template.md`, `.specs/decision_open_items.md` (D-049) | 조건부 승인: `G1-Run` 기준은 임시 승인으로 통과시키되, 최종 G1 서명(`G1-Sec` 포함)은 `SEC-003` L3 및 SEC-007 cadence 종료 후 확정 | L3 | `.agents/logs/verification/20260224_sec007_sec008_conditional_approval.md` | Platform | G1 | 1) Infra/Platform/DataEng 조건부 합동 서명 기록<br>2) 잔여 오픈 항목(`SEC-003`, SEC-007 cadence)과 리스크 수용 범위 명시<br>3) 잔여 항목 완료 시 SEC-008 최종 서명 로그로 대체 |
 
 #### 2026-02-23 인프라 재검증 스냅샷
 
